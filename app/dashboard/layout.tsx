@@ -6,8 +6,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
 export const metadata = {
-  title: "Dashboard · Bright",
-  description: "Recordings, summaries, and workspace activity.",
+  title: "Dashboard · dalog",
+  description: "Pushes, generated drafts, and repo connections.",
 }
 
 export default async function DashboardLayout({

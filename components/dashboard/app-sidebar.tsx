@@ -2,25 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import {
-  BarChart3,
-  CalendarDays,
-  ChevronRight,
-  ChevronsUpDown,
-  FolderOpen,
-  LayoutDashboard,
-  LifeBuoy,
-  LogOut,
-  Settings,
-  Sparkles,
-  Video,
-} from "lucide-react"
+import { usePathname } from "next/navigation"
+import { ChevronsUpDown, LogOut, Rss, Settings, Terminal } from "lucide-react"
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,14 +25,12 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
   SidebarSeparator,
-  useSidebar,
 } from "@/components/ui/sidebar"
-import { BrightButton } from "@/components/bright/button"
+import { GithubMark } from "@/components/dashboard/github-mark"
+import { WebhookPill } from "@/components/dashboard/status-pill"
+import { repos } from "@/lib/mock-data"
 
 /* Design-system nav link: 14px / 600, radius md 10, sunken active + hover. */
 const navButtonClass =
@@ -56,37 +38,29 @@ const navButtonClass =
 
 type NavItem = {
   label: string
+  href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
-  items?: string[]
 }
 
-const platformNav: NavItem[] = [
-  { label: "Overview", icon: LayoutDashboard },
-  {
-    label: "Recordings",
-    icon: Video,
-    badge: "12",
-    items: ["All recordings", "Needs review", "Shared with me"],
-  },
-  { label: "Calendar", icon: CalendarDays },
-  {
-    label: "Workspaces",
-    icon: FolderOpen,
-    items: ["Northwind", "Design", "Hiring"],
-  },
-  { label: "Insights", icon: BarChart3 },
+const workNav: NavItem[] = [
+  { label: "Activity", href: "/dashboard", icon: Rss, badge: "3" },
+  { label: "Repos", href: "/dashboard/repos", icon: GithubMark },
 ]
 
-const supportNav: NavItem[] = [
-  { label: "Settings", icon: Settings },
-  { label: "Support", icon: LifeBuoy },
+const accountNav: NavItem[] = [
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 function AppSidebar() {
-  const { state } = useSidebar()
-  const [active, setActive] = React.useState("Overview")
-  const collapsed = state === "collapsed"
+  const pathname = usePathname()
+  const brokenWebhooks = repos.filter(
+    (repo) => repo.webhook === "broken"
+  ).length
+
+  // /dashboard only matches exactly; everything else matches its subtree.
+  const isActive = (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname.startsWith(href)
 
   return (
     <Sidebar collapsible="icon">
@@ -96,19 +70,19 @@ function AppSidebar() {
             <SidebarMenuButton
               size="lg"
               asChild
-              tooltip="Bright"
+              tooltip="dalog"
               className="rounded-[10px]"
             >
               <Link href="/">
                 <span className="flex aspect-square size-8 items-center justify-center rounded-[8px] bg-accent-500 text-white">
-                  <Sparkles className="size-4" />
+                  <Terminal className="size-4" />
                 </span>
                 <span className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-[14px] font-extrabold tracking-[-0.02em] text-ink-900">
-                    Bright
+                    dalog
                   </span>
                   <span className="truncate text-xs text-ink-300">
-                    Northwind workspace
+                    {repos.length} repos connected
                   </span>
                 </span>
               </Link>
@@ -122,88 +96,52 @@ function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="font-mono text-[11px] tracking-[0.1em] text-ink-500 uppercase">
-            Platform
+            Workspace
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {platformNav.map((item) =>
-                item.items ? (
-                  <Collapsible
-                    key={item.label}
+              {workNav.map((item) => (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
                     asChild
-                    defaultOpen={false}
-                    className="group/collapsible"
+                    className={navButtonClass}
+                    tooltip={item.label}
+                    isActive={isActive(item.href)}
                   >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          className={navButtonClass}
-                          tooltip={item.label}
-                          isActive={active === item.label}
-                          onClick={() => setActive(item.label)}
-                        >
-                          <item.icon className="size-4" />
-                          <span>{item.label}</span>
-                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      {item.badge ? (
-                        <SidebarMenuBadge className="rounded-full border border-line bg-surface text-xs font-semibold text-ink-500">
-                        {item.badge}
-                      </SidebarMenuBadge>
-                      ) : null}
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.items.map((sub) => (
-                            <SidebarMenuSubItem key={sub}>
-                              <SidebarMenuSubButton asChild>
-                                <span className="cursor-pointer">{sub}</span>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                ) : (
-                  <SidebarMenuItem key={item.label}>
-                    <SidebarMenuButton
-                      className={navButtonClass}
-                      tooltip={item.label}
-                      isActive={active === item.label}
-                      onClick={() => setActive(item.label)}
-                    >
+                    <Link href={item.href}>
                       <item.icon className="size-4" />
                       <span>{item.label}</span>
-                    </SidebarMenuButton>
-                    {item.badge ? (
-                      <SidebarMenuBadge className="rounded-full border border-line bg-surface text-xs font-semibold text-ink-500">
-                        {item.badge}
-                      </SidebarMenuBadge>
-                    ) : null}
-                  </SidebarMenuItem>
-                )
-              )}
+                    </Link>
+                  </SidebarMenuButton>
+                  {item.badge ? (
+                    <SidebarMenuBadge className="rounded-full border border-line bg-surface text-xs font-semibold text-ink-500">
+                      {item.badge}
+                    </SidebarMenuBadge>
+                  ) : null}
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="font-mono text-[11px] tracking-[0.1em] text-ink-500 uppercase">
-            Support
+            Account
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {supportNav.map((item) => (
+              {accountNav.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
+                    asChild
                     className={navButtonClass}
                     tooltip={item.label}
-                    isActive={active === item.label}
-                    onClick={() => setActive(item.label)}
+                    isActive={isActive(item.href)}
                   >
-                    <item.icon className="size-4" />
-                    <span>{item.label}</span>
+                    <Link href={item.href}>
+                      <item.icon className="size-4" />
+                      <span>{item.label}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -213,34 +151,40 @@ function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        {/* Upgrade card collapses away with the sidebar. */}
-        {collapsed ? null : (
-          <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-canvas p-4">
+        {/* Connection health lives here so a dead webhook is visible from any page. */}
+        {brokenWebhooks > 0 ? (
+          <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-canvas p-4 group-data-[collapsible=icon]:hidden">
+            <WebhookPill status="broken" />
             <span className="text-[13px] leading-[1.5] text-ink-500">
-              9 days left on the Team trial.
+              {brokenWebhooks} repo stopped delivering pushes.
             </span>
-            <Link href="/#how-it-works" className="no-underline hover:no-underline">
-              <BrightButton size="sm" className="w-full">
-                Upgrade
-              </BrightButton>
+            <Link
+              href="/dashboard/repos"
+              className="text-[13px] font-bold text-accent-500 no-underline hover:no-underline"
+            >
+              Reconnect →
             </Link>
           </div>
-        )}
+        ) : null}
 
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" tooltip="Jane Mercer" className="rounded-[10px]">
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip="Saksham Sharma"
+                  className="rounded-[10px]"
+                >
                   <span className="flex aspect-square size-8 items-center justify-center rounded-full bg-accent-100 text-[11px] font-bold text-accent-600">
-                    JM
+                    SS
                   </span>
                   <span className="grid flex-1 text-left leading-tight">
                     <span className="truncate text-[13px] font-bold text-ink-900">
-                      Jane Mercer
+                      Saksham Sharma
                     </span>
                     <span className="truncate text-xs text-ink-300">
-                      jane@northwind.com
+                      @saksham-dev0
                     </span>
                   </span>
                   <ChevronsUpDown className="ml-auto size-4" />
@@ -252,14 +196,18 @@ function AppSidebar() {
                 className="w-56 rounded-[10px]"
               >
                 <DropdownMenuLabel className="text-xs text-ink-300">
-                  Signed in as jane@northwind.com
+                  Signed in with GitHub
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Settings className="size-4" /> Workspace settings
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/settings">
+                    <Settings className="size-4" /> Settings
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Sparkles className="size-4" /> Upgrade plan
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/repos">
+                    <GithubMark className="size-4" /> Manage repos
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
