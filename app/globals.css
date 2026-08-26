@@ -127,3 +127,79 @@
     @apply font-sans;
     }
 }
+/* ---------------------------------------------------------------
+   Bright design system tokens
+   Imported from "Bright Design System.dc.html"
+   --------------------------------------------------------------- */
+@theme {
+    /* Canvas & surface */
+    --color-canvas: #f5f5f6;
+    --color-surface: #ffffff;
+    --color-sunken: #f0f0f2;
+    --color-line: #e4e4e7;
+    --color-line-strong: #d6d6db;
+
+    /* Ink */
+    --color-ink-900: #101013;
+    --color-ink-700: #3a3a40;
+    --color-ink-500: #6c6c75;
+    --color-ink-300: #a8a8b0;
+
+    /* Accent */
+    --color-accent-700: #1b4ab6;
+    --color-accent-600: #1f55d0;
+    --color-accent-500: #2e6bf0;
+    --color-accent-200: #d6e3fd;
+    --color-accent-100: #e5edfe;
+    --color-accent-light: #8fb4fa;
+
+    /* Status */
+    --color-positive: #17924d;
+    --color-positive-ink: #0f6e3a;
+    --color-positive-tint: #e4f5eb;
+    --color-attention: #e8a317;
+    --color-attention-ink: #8a6100;
+    --color-attention-tint: #fcf2dc;
+    --color-critical: #d3453e;
+    --color-critical-strong: #b93a34;
+
+    /* Radius */
+    --radius-bright-sm: 6px;
+    --radius-bright-md: 10px;
+    --radius-bright-lg: 18px;
+
+    /* Elevation */
+    --shadow-e1: 0 1px 2px rgba(16, 16, 19, 0.04);
+    --shadow-e2: 0 4px 14px rgba(16, 16, 19, 0.07);
+    --shadow-e3: 0 18px 46px rgba(16, 16, 19, 0.12);
+}
+
+@theme inline {
+    --font-mono: var(--font-mono);
+}
+
+/* ---------------------------------------------------------------
+   Landing palette — matched to the amie.so reference capture
+   --------------------------------------------------------------- */
+@theme {
+    --color-page: #f7f7f7;
+    --color-sky-500: #1d9bf0;
+    --color-sky-600: #0d8bdf;
+    --color-eyebrow-green: #16a34a;
+    --color-eyebrow-purple: #8b5cf6;
+    --color-eyebrow-orange: #f97316;
+    --color-mark-pink: #f2545b;
+    --shadow-panel: 0 1px 2px rgba(16, 16, 19, 0.05), 0 8px 24px rgba(16, 16, 19, 0.05);
+}
+
+/* Sidebar tokens remapped onto the Bright palette. */
+:root {
+    --sidebar: #ffffff;
+    --sidebar-foreground: #3a3a40;
+    --sidebar-primary: #2e6bf0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f0f0f2;
+    --sidebar-accent-foreground: #101013;
+    --sidebar-border: #e4e4e7;
+    --sidebar-ring: #2e6bf0;
+}
