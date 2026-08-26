@@ -13,12 +13,13 @@ export type Stat = {
 
 function StatCard({ label, value, delta, trend, meta }: Stat) {
   return (
-    <Surface className="flex flex-col gap-3 p-[22px]">
+    <Surface className="flex flex-col gap-3 p-[26px]">
+      {/* Eyebrow · H2 · Caption — straight off the type scale */}
       <span className="font-mono text-[11px] tracking-[0.1em] text-ink-500 uppercase">
         {label}
       </span>
       <div className="flex items-baseline gap-[10px]">
-        <span className="text-[32px] leading-none font-extrabold tracking-[-0.03em]">
+        <span className="text-[26px] leading-[1.15] font-extrabold tracking-[-0.025em]">
           {value}
         </span>
         <span

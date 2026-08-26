@@ -203,3 +203,12 @@
     --sidebar-border: #e4e4e7;
     --sidebar-ring: #2e6bf0;
 }
+
+/* shadcn primitives aligned to the Bright token values. */
+:root {
+    --foreground: #101013;
+    --muted-foreground: #6c6c75;
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --ring: #2e6bf0;
+}

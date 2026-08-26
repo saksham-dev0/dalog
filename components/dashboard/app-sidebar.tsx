@@ -50,6 +50,10 @@ import {
 } from "@/components/ui/sidebar"
 import { BrightButton } from "@/components/bright/button"
 
+/* Design-system nav link: 14px / 600, radius md 10, sunken active + hover. */
+const navButtonClass =
+  "rounded-[10px] text-sm font-semibold text-ink-500 hover:bg-canvas hover:text-ink-900 data-active:bg-sunken data-active:font-semibold data-active:text-ink-900"
+
 type NavItem = {
   label: string
   icon: React.ComponentType<{ className?: string }>
@@ -89,7 +93,12 @@ function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="Bright">
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              tooltip="Bright"
+              className="rounded-[10px]"
+            >
               <Link href="/">
                 <span className="flex aspect-square size-8 items-center justify-center rounded-[8px] bg-accent-500 text-white">
                   <Sparkles className="size-4" />
@@ -112,7 +121,9 @@ function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-mono text-[11px] tracking-[0.1em] text-ink-500 uppercase">
+            Platform
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {platformNav.map((item) =>
@@ -126,6 +137,7 @@ function AppSidebar() {
                     <SidebarMenuItem>
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton
+                          className={navButtonClass}
                           tooltip={item.label}
                           isActive={active === item.label}
                           onClick={() => setActive(item.label)}
@@ -136,7 +148,9 @@ function AppSidebar() {
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       {item.badge ? (
-                        <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                        <SidebarMenuBadge className="rounded-full border border-line bg-surface text-xs font-semibold text-ink-500">
+                        {item.badge}
+                      </SidebarMenuBadge>
                       ) : null}
                       <CollapsibleContent>
                         <SidebarMenuSub>
@@ -154,6 +168,7 @@ function AppSidebar() {
                 ) : (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
+                      className={navButtonClass}
                       tooltip={item.label}
                       isActive={active === item.label}
                       onClick={() => setActive(item.label)}
@@ -162,7 +177,9 @@ function AppSidebar() {
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                     {item.badge ? (
-                      <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                      <SidebarMenuBadge className="rounded-full border border-line bg-surface text-xs font-semibold text-ink-500">
+                        {item.badge}
+                      </SidebarMenuBadge>
                     ) : null}
                   </SidebarMenuItem>
                 )
@@ -172,12 +189,15 @@ function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel>Support</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-mono text-[11px] tracking-[0.1em] text-ink-500 uppercase">
+            Support
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {supportNav.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
+                    className={navButtonClass}
                     tooltip={item.label}
                     isActive={active === item.label}
                     onClick={() => setActive(item.label)}
@@ -195,7 +215,7 @@ function AppSidebar() {
       <SidebarFooter>
         {/* Upgrade card collapses away with the sidebar. */}
         {collapsed ? null : (
-          <div className="flex flex-col gap-3 rounded-[12px] border border-line bg-canvas p-3">
+          <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-canvas p-4">
             <span className="text-[13px] leading-[1.5] text-ink-500">
               9 days left on the Team trial.
             </span>
@@ -211,7 +231,7 @@ function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" tooltip="Jane Mercer">
+                <SidebarMenuButton size="lg" tooltip="Jane Mercer" className="rounded-[10px]">
                   <span className="flex aspect-square size-8 items-center justify-center rounded-full bg-accent-100 text-[11px] font-bold text-accent-600">
                     JM
                   </span>
@@ -229,7 +249,7 @@ function AppSidebar() {
               <DropdownMenuContent
                 side="right"
                 align="end"
-                className="w-56 rounded-[12px]"
+                className="w-56 rounded-[10px]"
               >
                 <DropdownMenuLabel className="text-xs text-ink-300">
                   Signed in as jane@northwind.com

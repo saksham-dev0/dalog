@@ -17,18 +17,22 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 
 function DashboardTopbar() {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-canvas px-4">
-      <SidebarTrigger className="text-ink-500" />
-      <Separator orientation="vertical" className="mr-1 h-4" />
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas px-4">
+      <SidebarTrigger className="rounded-[10px] text-ink-500 hover:bg-sunken hover:text-ink-900" />
+      <Separator orientation="vertical" className="mr-1 h-4 bg-line" />
 
+      {/* Nav-link type from the system: 14px / 600 */}
       <Breadcrumb className="hidden sm:block">
-        <BreadcrumbList>
+        <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard" className="text-ink-500">
+            <BreadcrumbLink
+              href="/dashboard"
+              className="font-semibold text-ink-500 hover:text-ink-900"
+            >
               Northwind
             </BreadcrumbLink>
           </BreadcrumbItem>
-          <BreadcrumbSeparator />
+          <BreadcrumbSeparator className="text-ink-300" />
           <BreadcrumbItem>
             <BreadcrumbPage className="font-semibold text-ink-900">
               Overview
@@ -37,12 +41,13 @@ function DashboardTopbar() {
         </BreadcrumbList>
       </Breadcrumb>
 
+      {/* Pill input, sunken fill, 15px body — matches the email-capture spec */}
       <div className="relative ml-auto hidden w-full max-w-[320px] md:block">
-        <Search className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-300" />
+        <Search className="absolute top-1/2 left-[18px] size-4 -translate-y-1/2 text-ink-300" />
         <input
           aria-label="Search recordings"
           placeholder="Search across every call…"
-          className="w-full rounded-full border border-line bg-surface py-[9px] pr-4 pl-10 text-sm text-ink-900 outline-none placeholder:text-ink-300 focus:border-accent-500"
+          className="w-full rounded-full border border-line bg-canvas py-[9px] pr-[18px] pl-11 text-[15px] text-ink-900 outline-none placeholder:text-ink-300 focus:border-accent-500 focus:bg-surface"
         />
       </div>
 

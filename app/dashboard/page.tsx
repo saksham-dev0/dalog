@@ -122,7 +122,7 @@ export default function DashboardPage() {
         <div className="flex min-w-0 flex-col gap-[14px]">
           <div className="flex items-center justify-between gap-4">
             <SpecLabel>Recent recordings</SpecLabel>
-            <button className="cursor-pointer bg-transparent text-[13px] font-bold text-accent-500">
+            <button className="cursor-pointer bg-transparent text-sm font-bold text-accent-500">
               View all
             </button>
           </div>
@@ -135,7 +135,7 @@ export default function DashboardPage() {
 
         <div className="flex flex-col gap-5">
           {/* Today */}
-          <Surface className="flex flex-col gap-4 p-[22px]">
+          <Surface className="flex flex-col gap-4 p-[26px]">
             <div className="flex items-center justify-between gap-3">
               <SpecLabel>Today</SpecLabel>
               <BrightBadge tone="neutral">4 events</BrightBadge>
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           </Surface>
 
           {/* Processing */}
-          <Surface className="flex flex-col gap-4 p-[22px]">
+          <Surface className="flex flex-col gap-4 p-[26px]">
             <SpecLabel>Processing</SpecLabel>
             <div className="flex flex-col gap-2">
               <div className="flex justify-between">
@@ -196,14 +196,14 @@ export default function DashboardPage() {
           </Surface>
 
           {/* Workspace */}
-          <Surface className="flex flex-col gap-4 p-[22px]">
+          <Surface className="flex flex-col gap-4 p-[26px]">
             <SpecLabel>Workspace</SpecLabel>
             <div className="flex items-center gap-3">
               <div className="flex">
-                <div className="size-8 rounded-full border-2 border-white bg-accent-100" />
-                <div className="-ml-[10px] size-8 rounded-full border-2 border-white bg-positive-tint" />
-                <div className="-ml-[10px] size-8 rounded-full border-2 border-white bg-attention-tint" />
-                <div className="-ml-[10px] flex size-8 items-center justify-center rounded-full border-2 border-white bg-sunken text-[11px] font-bold text-ink-500">
+                <div className="size-8 rounded-full border-2 border-surface bg-accent-100" />
+                <div className="-ml-[10px] size-8 rounded-full border-2 border-surface bg-positive-tint" />
+                <div className="-ml-[10px] size-8 rounded-full border-2 border-surface bg-attention-tint" />
+                <div className="-ml-[10px] flex size-8 items-center justify-center rounded-full border-2 border-surface bg-sunken text-[11px] font-bold text-ink-500">
                   +6
                 </div>
               </div>
