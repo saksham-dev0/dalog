@@ -15,7 +15,9 @@ const columns = "grid grid-cols-[2fr_1.4fr_1fr_0.8fr] gap-4"
 function BrightDataTable({ rows }: { rows: MeetingRow[] }) {
   return (
     <Surface elevation="none" className="overflow-hidden">
-      <div className={`${columns} border-b border-line bg-canvas px-[22px] py-[14px]`}>
+      <div
+        className={`${columns} border-b border-line bg-canvas px-[22px] py-[14px]`}
+      >
         {["Meeting", "Owner", "Status", "Length"].map((head, i) => (
           <span
             key={head}

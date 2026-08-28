@@ -320,6 +320,7 @@ export const recordEvents = internalMutation({
     if (!repo) return 0
 
     let inserted = 0
+    const insertedMerges: Id<"repoEvents">[] = []
     for (const event of args.events) {
       const duplicate = await ctx.db
         .query("repoEvents")
@@ -329,7 +330,7 @@ export const recordEvents = internalMutation({
         .first()
       if (duplicate) continue
 
-      await ctx.db.insert("repoEvents", {
+      const eventId = await ctx.db.insert("repoEvents", {
         ...event,
         repo: repo._id,
         ownerToken: repo.ownerToken,
@@ -337,6 +338,7 @@ export const recordEvents = internalMutation({
         source: args.source,
       })
       inserted += 1
+      if (event.kind === "merge") insertedMerges.push(eventId)
     }
 
     await ctx.db.patch("watchedRepos", repo._id, {

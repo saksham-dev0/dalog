@@ -11,10 +11,7 @@ function SegmentedTabs({ tabs }: { tabs: SegmentedTab[] }) {
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div
-        role="tablist"
-        className="flex gap-1 rounded-full bg-sunken p-1"
-      >
+      <div role="tablist" className="flex gap-1 rounded-full bg-sunken p-1">
         {tabs.map((tab, i) => (
           <button
             key={tab.label}

@@ -1,12 +1,17 @@
 "use client"
 
+import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
+  ExternalLink,
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
   GitPullRequest,
+  Loader2,
 } from "lucide-react"
-import { usePaginatedQuery } from "convex/react"
+import { useMutation, usePaginatedQuery } from "convex/react"
+import { toast } from "sonner"
 
 import { BrightBadge } from "@/components/bright/badge"
 import { BrightButton } from "@/components/bright/button"
@@ -36,23 +41,31 @@ function formatWhen(timestamp: number) {
 function EventRow({
   event,
   last,
+  onOpen,
+  opening,
 }: {
   event: Doc<"repoEvents">
   last: boolean
+  onOpen: (event: Doc<"repoEvents">) => void
+  opening: boolean
 }) {
   const { icon: Icon, tone, label } = kindMeta[event.kind]
 
   return (
-    <a
-      href={event.url}
-      target="_blank"
-      rel="noreferrer"
-      className={`flex items-center gap-4 px-[22px] py-[18px] no-underline hover:bg-hover hover:no-underline ${
+    <button
+      type="button"
+      onClick={() => onOpen(event)}
+      disabled={opening}
+      className={`flex w-full cursor-pointer items-center gap-4 bg-transparent px-[22px] py-[18px] text-left hover:bg-hover ${
         last ? "" : "border-b border-sunken"
       }`}
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-sunken text-ink-500">
-        <Icon className="size-[16px]" />
+        {opening ? (
+          <Loader2 className="size-[16px] animate-spin" />
+        ) : (
+          <Icon className="size-[16px]" />
+        )}
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-[6px]">
@@ -91,7 +104,19 @@ function EventRow({
       <span className="w-[70px] shrink-0 text-right text-[13px] text-ink-300">
         {formatWhen(event.occurredAt)}
       </span>
-    </a>
+      <span
+        role="link"
+        tabIndex={0}
+        aria-label="Open on GitHub"
+        onClick={(clickEvent) => {
+          clickEvent.stopPropagation()
+          window.open(event.url, "_blank", "noreferrer")
+        }}
+        className="shrink-0 text-ink-300 hover:text-accent-500"
+      >
+        <ExternalLink className="size-[14px]" />
+      </span>
+    </button>
   )
 }
 
@@ -105,6 +130,35 @@ function ActivityFeed() {
     {},
     { initialNumItems: 25 }
   )
+  const openDraft = useMutation(api.content.openEventDraft)
+  const router = useRouter()
+  const [opening, setOpening] = React.useState<string | null>(null)
+
+  /** Click a row → open (or reuse) its draft and let the scan run in the
+   *  background. The content page picks the scan up from there. */
+  const open = async (event: Doc<"repoEvents">) => {
+    setOpening(event._id)
+    const toastId = toast.loading(`Scanning ${event.kind.replace("_", " ")}…`, {
+      description: event.title,
+    })
+
+    try {
+      const draftId = await openDraft({ eventId: event._id })
+      toast.success("Scan running in the background", {
+        id: toastId,
+        description: "Opening the draft — generate once the context lands.",
+      })
+      router.push(`/dashboard/content/${draftId}`)
+    } catch (error) {
+      toast.error("Could not open that change", {
+        id: toastId,
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      })
+    } finally {
+      setOpening(null)
+    }
+  }
 
   if (status === "LoadingFirstPage") {
     return (
@@ -126,7 +180,8 @@ function ActivityFeed() {
         <BrightBadge tone="neutral">Nothing yet</BrightBadge>
         <p className="max-w-[420px] text-[15px] leading-[1.6] text-ink-500">
           Watch a repo on the Repos page. Its commits, pull requests, merges and
-          branches show up here the moment they happen.
+          branches show up here the moment they happen. Click any of them to
+          have the AI scan it and draft posts.
         </p>
       </Surface>
     )
@@ -140,6 +195,8 @@ function ActivityFeed() {
             key={event._id}
             event={event}
             last={i === results.length - 1}
+            onOpen={open}
+            opening={opening === event._id}
           />
         ))}
       </Surface>

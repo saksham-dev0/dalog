@@ -10,8 +10,7 @@ const buttonBase =
 
 const buttonTones = {
   primary: "bg-sky-500 text-white hover:bg-sky-600",
-  outline:
-    "border border-line bg-surface text-ink-900 shadow-e1 hover:bg-page",
+  outline: "border border-line bg-surface text-ink-900 shadow-e1 hover:bg-page",
 } as const
 
 function ActionButton({
@@ -28,7 +27,10 @@ function ActionButton({
 
   if (href) {
     return (
-      <Link href={href} className={cn(classes, "no-underline hover:no-underline")}>
+      <Link
+        href={href}
+        className={cn(classes, "no-underline hover:no-underline")}
+      >
         {children}
       </Link>
     )
@@ -44,7 +46,10 @@ function ActionButton({
 /* Centered content column — the reference keeps everything in ~960px. */
 function Wrap({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("mx-auto w-full max-w-[960px] px-6", className)} {...props} />
+    <div
+      className={cn("mx-auto w-full max-w-[960px] px-6", className)}
+      {...props}
+    />
   )
 }
 
@@ -63,7 +68,9 @@ function SectionEyebrow({
   children: React.ReactNode
 }) {
   return (
-    <span className={cn("text-sm font-bold", eyebrowTones[tone])}>{children}</span>
+    <span className={cn("text-sm font-bold", eyebrowTones[tone])}>
+      {children}
+    </span>
   )
 }
 
@@ -104,7 +111,10 @@ function Body({ className, ...props }: React.ComponentProps<"p">) {
 
 function Caption({ className, ...props }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-center text-xs text-ink-300", className)} {...props} />
+    <p
+      className={cn("text-center text-xs text-ink-300", className)}
+      {...props}
+    />
   )
 }
 
@@ -122,9 +132,14 @@ function CheckItem({
           <Check className="size-[9px] text-positive" strokeWidth={4} />
         </span>
       ) : (
-        <Check className="mt-[3px] size-[13px] shrink-0 text-positive" strokeWidth={3} />
+        <Check
+          className="mt-[3px] size-[13px] shrink-0 text-positive"
+          strokeWidth={3}
+        />
       )}
-      <span className="text-[15px] leading-[1.55] text-ink-700">{children}</span>
+      <span className="text-[15px] leading-[1.55] text-ink-700">
+        {children}
+      </span>
     </li>
   )
 }
@@ -170,7 +185,9 @@ function RuleQuote({
         tone === "green" ? "border-positive" : "border-eyebrow-purple"
       )}
     >
-      <p className="text-[15px] leading-[1.6] font-medium text-ink-900">{quote}</p>
+      <p className="text-[15px] leading-[1.6] font-medium text-ink-900">
+        {quote}
+      </p>
       <footer className="text-[13px] text-ink-300">
         <span className="font-semibold text-ink-500">{name}</span> • {role}
       </footer>
@@ -183,7 +200,7 @@ function Scribble({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       className={cn(
-        "font-mono text-[13px] italic text-eyebrow-green",
+        "font-mono text-[13px] text-eyebrow-green italic",
         className
       )}
       {...props}
