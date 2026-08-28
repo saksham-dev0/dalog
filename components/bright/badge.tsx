@@ -12,7 +12,7 @@ const brightBadgeVariants = cva(
         positive: "bg-positive-tint text-positive",
         attention: "bg-attention-tint text-attention-ink",
         neutral: "border border-line bg-surface font-semibold text-ink-500",
-        inverse: "bg-ink-900 text-white",
+        inverse: "bg-ink-900 text-canvas",
       },
     },
     defaultVariants: { tone: "accent" },

@@ -1,6 +1,9 @@
+import { ClerkProvider } from "@clerk/nextjs"
+import { shadcn } from "@clerk/ui/themes"
 import { IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google"
 
 import "./globals.css"
+import { ConvexClientProvider } from "@/components/convex-client-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
@@ -31,13 +34,22 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
+      className={cn(
+        "antialiased",
+        fontMono.variable,
+        "font-sans",
+        fontSans.variable
+      )}
     >
       <body>
-        <ThemeProvider>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <ClerkProvider appearance={{ theme: shadcn }}>
+          <ConvexClientProvider>
+            <ThemeProvider>
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </ConvexClientProvider>
+        </ClerkProvider>
       </body>
     </html>
   )

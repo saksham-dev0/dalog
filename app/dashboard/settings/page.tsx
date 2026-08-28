@@ -1,18 +1,30 @@
-import { RotateCw } from "lucide-react"
-
 import { GithubMark } from "@/components/dashboard/github-mark"
 
 import { BrightBadge, SpecLabel } from "@/components/bright/badge"
 import { BrightButton } from "@/components/bright/button"
 import { Surface } from "@/components/bright/card"
-import { repos } from "@/lib/mock-data"
+import {
+  ConnectGithubButton,
+  DisconnectGithubButton,
+} from "@/components/dashboard/connect-github-button"
+import { api } from "@/convex/_generated/api"
+import { convexServerQuery } from "@/lib/convex-server"
+import { getGithubConnection } from "@/lib/github"
 
 export const metadata = {
   title: "Settings · dalog",
   description: "Account and GitHub connection.",
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const connection = await getGithubConnection()
+  const watched = connection
+    ? await convexServerQuery(
+        (client) => client.query(api.repos.listWatched, {}),
+        []
+      )
+    : []
+
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-7">
       <div className="flex flex-col gap-2">
@@ -50,14 +62,18 @@ export default function SettingsPage() {
         </p>
       </Surface>
 
-      {/* GitHub connection */}
+      {/* GitHub connection — live, straight off the Clerk external account. */}
       <Surface className="flex flex-col gap-5 p-[26px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SpecLabel>GitHub</SpecLabel>
-          <BrightBadge tone="positive" className="gap-[6px] px-[10px] py-1">
-            <span className="size-[6px] rounded-full bg-positive" />
-            Connected
-          </BrightBadge>
+          {connection ? (
+            <BrightBadge tone="positive" className="gap-[6px] px-[10px] py-1">
+              <span className="size-[6px] rounded-full bg-positive" />
+              Connected
+            </BrightBadge>
+          ) : (
+            <BrightBadge tone="neutral">Not connected</BrightBadge>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
@@ -66,16 +82,35 @@ export default function SettingsPage() {
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="text-[15px] font-bold text-ink-900">
-              @saksham-dev0
+              {connection
+                ? connection.username
+                  ? `@${connection.username}`
+                  : "GitHub account"
+                : "No GitHub account linked"}
             </span>
-            <span className="text-[13px] text-ink-300">
-              {repos.length} repos watched · scopes: repo, admin:repo_hook
+            <span className="truncate text-[13px] text-ink-300">
+              {connection
+                ? `${watched.length} ${watched.length === 1 ? "repo" : "repos"} watched · scopes: ${
+                    connection.scopes.length
+                      ? connection.scopes.join(", ")
+                      : "default"
+                  }`
+                : "Connect to pick the repos dalog drafts from."}
             </span>
           </div>
-          <BrightButton variant="secondary" size="sm" className="gap-1.5">
-            <RotateCw className="size-[14px]" />
-            Re-authenticate
-          </BrightButton>
+          {connection ? (
+            <div className="flex items-center gap-2">
+              <ConnectGithubButton
+                label="Re-authenticate"
+                variant="secondary"
+              />
+              <DisconnectGithubButton
+                externalAccountId={connection.externalAccountId}
+              />
+            </div>
+          ) : (
+            <ConnectGithubButton label="Connect GitHub" />
+          )}
         </div>
 
         <p className="border-t border-sunken pt-4 text-[13px] text-ink-300">

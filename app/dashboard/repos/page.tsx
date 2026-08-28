@@ -1,19 +1,21 @@
-import { GitBranch, Lock, Plus, RotateCw, Unlink } from "lucide-react"
-
-import { GithubMark } from "@/components/dashboard/github-mark"
-
 import { BrightBadge, SpecLabel } from "@/components/bright/badge"
-import { BrightButton } from "@/components/bright/button"
 import { Surface } from "@/components/bright/card"
-import { WebhookPill } from "@/components/dashboard/status-pill"
-import { repos } from "@/lib/mock-data"
+import {
+  ConnectGithubButton,
+  DisconnectGithubButton,
+} from "@/components/dashboard/connect-github-button"
+import { RepoList } from "@/components/dashboard/repo-list"
+import { getGithubConnection, listGithubRepos } from "@/lib/github"
 
 export const metadata = {
   title: "Repos · dalog",
-  description: "Connect repos and keep their webhooks alive.",
+  description: "Connect GitHub and pick the repos dalog watches.",
 }
 
-export default function ReposPage() {
+export default async function ReposPage() {
+  const connection = await getGithubConnection()
+  const repos = connection ? await listGithubRepos() : null
+
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -23,91 +25,82 @@ export default function ReposPage() {
             Connected repos
           </h1>
           <p className="text-[15px] leading-[1.6] text-ink-500">
-            Connection health only. Counts live on the activity feed.
+            {connection
+              ? "Watch a repo and dalog tracks its commits, PRs, merges and branches as they land."
+              : "Connect GitHub once — dalog reads the repos you grant it."}
           </p>
         </div>
-        {/* Opens the GitHub repo picker, scoped by the OAuth grant. */}
-        <BrightButton size="sm" className="gap-1.5 px-[18px] py-[9px] text-sm">
-          <Plus className="size-4" />
-          Connect a repo
-        </BrightButton>
+        {connection ? (
+          <div className="flex items-center gap-2">
+            <BrightBadge tone="positive" className="gap-[6px] px-[10px] py-1">
+              <span className="size-[6px] rounded-full bg-positive" />
+              {connection.username ? `@${connection.username}` : "Connected"}
+            </BrightBadge>
+            <DisconnectGithubButton
+              externalAccountId={connection.externalAccountId}
+            />
+          </div>
+        ) : (
+          <ConnectGithubButton
+            label="Connect GitHub"
+            className="gap-1.5 px-[18px] py-[9px] text-sm"
+          />
+        )}
       </div>
 
-      <div className="flex flex-col gap-4">
-        {repos.map((repo) => (
+      {connection ? (
+        repos === null ? (
+          /* Token rejected or revoked on GitHub's side — re-consent fixes it. */
           <Surface
-            key={repo.id}
-            className="flex flex-wrap items-center gap-5 p-[22px]"
+            elevation="none"
+            className="flex flex-col items-center gap-4 border-dashed p-10 text-center"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-sunken text-ink-900">
-              <GithubMark className="size-[18px]" />
-            </span>
-
-            <div className="flex min-w-[220px] flex-1 flex-col gap-[6px]">
-              <div className="flex items-center gap-2">
-                <span className="text-[15px] font-bold text-ink-900">
-                  {repo.name}
-                </span>
-                {repo.private ? (
-                  <span className="flex items-center gap-1 text-ink-300">
-                    <Lock className="size-3" />
-                    <span className="text-xs">Private</span>
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-[13px] text-ink-300">
-                <span className="flex items-center gap-1.5">
-                  <GitBranch className="size-[14px]" />
-                  <span className="font-mono text-[12px]">{repo.branch}</span>
-                </span>
-                <span>·</span>
-                <span>Connected {repo.connectedAt}</span>
-              </div>
-            </div>
-
-            <WebhookPill status={repo.webhook} />
-
-            <div className="flex items-center gap-2">
-              {repo.webhook === "broken" ? (
-                <BrightButton size="sm" className="gap-1.5">
-                  <RotateCw className="size-[14px]" />
-                  Reconnect webhook
-                </BrightButton>
-              ) : (
-                <BrightButton variant="secondary" size="sm" className="gap-1.5">
-                  <RotateCw className="size-[14px]" />
-                  Re-send test ping
-                </BrightButton>
-              )}
-              <BrightButton variant="ghost" size="sm" className="gap-1.5">
-                <Unlink className="size-[14px]" />
-                Disconnect
-              </BrightButton>
-            </div>
+            <BrightBadge tone="attention">GitHub unreachable</BrightBadge>
+            <p className="max-w-[420px] text-[15px] leading-[1.6] text-ink-500">
+              dalog could not read your repos. The grant may have been revoked
+              on GitHub. Re-connect to hand it a fresh token.
+            </p>
+            <ConnectGithubButton
+              label="Re-connect GitHub"
+              variant="secondary"
+            />
           </Surface>
-        ))}
-      </div>
-
-      {/* Empty-state preview of the picker, so the flow reads end to end. */}
-      <Surface
-        elevation="none"
-        className="flex flex-col items-center gap-4 border-dashed p-10 text-center"
-      >
-        <BrightBadge tone="neutral">GitHub OAuth</BrightBadge>
-        <div className="flex max-w-[420px] flex-col gap-2">
-          <h2 className="text-[19px] font-extrabold tracking-[-0.02em]">
-            Watching a new repo takes one click
-          </h2>
-          <p className="text-[15px] leading-[1.6] text-ink-500">
-            Pick a repo you already granted access to. dalog installs the push
-            webhook and starts drafting on the next commit.
-          </p>
-        </div>
-        <BrightButton variant="secondary" size="sm" className="gap-1.5">
-          <GithubMark className="size-4" />
-          Browse your repos
-        </BrightButton>
-      </Surface>
+        ) : repos.length === 0 ? (
+          <Surface
+            elevation="none"
+            className="flex flex-col items-center gap-3 border-dashed p-10 text-center"
+          >
+            <p className="text-[15px] text-ink-500">
+              That GitHub account has no repos dalog can see. Grant access to
+              more repos or organizations, then re-connect.
+            </p>
+            <ConnectGithubButton
+              label="Re-connect GitHub"
+              variant="secondary"
+            />
+          </Surface>
+        ) : (
+          <RepoList repos={repos} />
+        )
+      ) : (
+        <Surface
+          elevation="none"
+          className="flex flex-col items-center gap-4 border-dashed p-10 text-center"
+        >
+          <BrightBadge tone="neutral">GitHub OAuth</BrightBadge>
+          <div className="flex max-w-[420px] flex-col gap-2">
+            <h2 className="text-[19px] font-extrabold tracking-[-0.02em]">
+              Watching a repo takes one click
+            </h2>
+            <p className="text-[15px] leading-[1.6] text-ink-500">
+              Authorize dalog on GitHub and every repo you grant shows up here.
+              Watch one and its commits, pull requests, merges and branches
+              stream into your activity feed.
+            </p>
+          </div>
+          <ConnectGithubButton label="Connect GitHub" />
+        </Surface>
+      )}
     </div>
   )
 }

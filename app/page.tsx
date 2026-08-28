@@ -51,7 +51,15 @@ const noBotList = [
   "Separates speakers and remembers their names",
 ]
 
-const callProviders = ["Zoom", "Meet", "Teams", "Slack", "Webex", "Whereby", "BlueJeans"]
+const callProviders = [
+  "Zoom",
+  "Meet",
+  "Teams",
+  "Slack",
+  "Webex",
+  "Whereby",
+  "BlueJeans",
+]
 
 const greetings = [
   "안녕하세요",
@@ -237,14 +245,15 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
-              <ActionButton href="/auth?mode=signup">Get started</ActionButton>
-              <ActionButton href="/auth?mode=signin" tone="outline">
+              <ActionButton href="/sign-up">Get started</ActionButton>
+              <ActionButton href="/sign-in" tone="outline">
                 <span className="text-base">☕</span> Request a demo
               </ActionButton>
             </div>
 
             <p className="pt-4 text-[13px] text-ink-500">
-              ✦ Aug 20: better booking links, slack integration, many experiments
+              ✦ Aug 20: better booking links, slack integration, many
+              experiments
             </p>
           </Wrap>
 
@@ -259,7 +268,9 @@ export default function LandingPage() {
         {/* ---------- Trusted by ---------- */}
         <section className="py-16">
           <Wrap className="flex flex-col gap-5">
-            <span className="text-[13px] text-ink-300">Trusted by teams at</span>
+            <span className="text-[13px] text-ink-300">
+              Trusted by teams at
+            </span>
             <div className="flex flex-wrap items-center gap-x-8 gap-y-4 opacity-60 grayscale">
               {trustedLogos.map((logo) => (
                 <span
@@ -287,7 +298,7 @@ export default function LandingPage() {
               Share summary. Keep CRM updated. Plan action items. Schedule next
               meeting.
             </h2>
-            <ActionButton href="/auth?mode=signup">Get started</ActionButton>
+            <ActionButton href="/sign-up">Get started</ActionButton>
           </Wrap>
         </section>
 
@@ -309,9 +320,9 @@ export default function LandingPage() {
                 cheaper.
               </Body>
               <Body>
-                If you want to use them to become better at your job, you&apos;ll
-                need Bright. An app that knows your conversations, should be able
-                to take over your busy work.
+                If you want to use them to become better at your job,
+                you&apos;ll need Bright. An app that knows your conversations,
+                should be able to take over your busy work.
               </Body>
             </div>
 
@@ -330,14 +341,20 @@ export default function LandingPage() {
               ].map((review, i) => (
                 <div
                   key={review.name}
-                  className={i === 1 ? "flex flex-col gap-3 sm:pl-8" : "flex flex-col gap-3"}
+                  className={
+                    i === 1
+                      ? "flex flex-col gap-3 sm:pl-8"
+                      : "flex flex-col gap-3"
+                  }
                 >
                   <div className="flex items-start justify-between gap-3">
                     <Stars />
                     <span className="size-5 rounded-[6px] bg-[linear-gradient(135deg,#E01E5A,#36C5F0,#2EB67D,#ECB22E)]" />
                   </div>
                   <p className="text-[13px]">
-                    <span className="font-bold text-ink-900">{review.name},</span>{" "}
+                    <span className="font-bold text-ink-900">
+                      {review.name},
+                    </span>{" "}
                     <span className="text-ink-500">{review.role}</span>
                   </p>
                   <p className="text-[14px] leading-[1.6] text-ink-500">
@@ -357,8 +374,8 @@ export default function LandingPage() {
                 meeting into clear next steps.
               </Body>
               <Body>
-                The common problem with AI summaries is that they don&apos;t know
-                the context of your meeting and company. We ensure great
+                The common problem with AI summaries is that they don&apos;t
+                know the context of your meeting and company. We ensure great
                 summaries in two ways.
               </Body>
             </div>
@@ -453,8 +470,8 @@ export default function LandingPage() {
             <SubHeading>Works wherever you have meetings</SubHeading>
             <Body>
               Recording works for calls across all providers. Whether you use
-              Zoom, Google Meet, Slack Huddle, or Microsoft Teams, we&apos;ll get
-              the notes.
+              Zoom, Google Meet, Slack Huddle, or Microsoft Teams, we&apos;ll
+              get the notes.
             </Body>
 
             <div className="mt-4 grid grid-cols-4 divide-x divide-line overflow-hidden rounded-[12px] border border-line bg-surface sm:grid-cols-7">
@@ -487,8 +504,8 @@ export default function LandingPage() {
               <SubHeading>Customize the summary with private notes</SubHeading>
               <Body>
                 Take notes in private, before or during the meeting. We&apos;ll
-                then use those raw notes as focus points for the summary. You can
-                define the headings we should use. List out key numbers as
+                then use those raw notes as focus points for the summary. You
+                can define the headings we should use. List out key numbers as
                 emphasis. Or use it to prepare the agenda.
               </Body>
               <Body>
@@ -511,7 +528,10 @@ export default function LandingPage() {
 
             <div className="flex w-full max-w-[620px] items-center">
               {["Today", "Day 3", "Day 7"].map((step, i) => (
-                <div key={step} className="flex flex-1 items-center last:flex-none">
+                <div
+                  key={step}
+                  className="flex flex-1 items-center last:flex-none"
+                >
                   <span
                     className={
                       i === 0
@@ -541,7 +561,7 @@ export default function LandingPage() {
               ))}
             </div>
 
-            <ActionButton href="/auth?mode=signup">Start free trial</ActionButton>
+            <ActionButton href="/sign-up">Start free trial</ActionButton>
           </Wrap>
         </section>
 
@@ -559,9 +579,9 @@ export default function LandingPage() {
               </span>
               <div className="flex flex-col gap-2">
                 <p className="max-w-[420px] rounded-[10px] bg-sunken px-4 py-3 text-[15px] leading-[1.55] text-ink-900">
-                  It&apos;s like ChatGPT, but it has full context about my company
-                  and job. It&apos;s integrated with Gcal and Gmail. So no more
-                  copy+pasting.
+                  It&apos;s like ChatGPT, but it has full context about my
+                  company and job. It&apos;s integrated with Gcal and Gmail. So
+                  no more copy+pasting.
                 </p>
                 <span className="text-[13px] text-ink-300">
                   Dennis Müller • Founder, Bright
@@ -584,13 +604,15 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-[64px_1fr] border-b border-line px-4 py-[10px] text-[13px]">
                 <span className="text-ink-500">Subject</span>
-                <span className="text-ink-900">Feedback - Loving the new Bright!</span>
+                <span className="text-ink-900">
+                  Feedback - Loving the new Bright!
+                </span>
               </div>
               <div className="flex flex-col gap-3 px-4 py-4 text-[13px] leading-[1.6] text-ink-700">
                 <p>
                   You absolutely cooked - loving the new Bright. Was an instant
-                  upgrade to Business for me. I had churned last year but you won
-                  me back.
+                  upgrade to Business for me. I had churned last year but you
+                  won me back.
                 </p>
                 <p>
                   With tasks / calendar / meeting recordings, you replaced
@@ -605,9 +627,9 @@ export default function LandingPage() {
                   lists → add to calendar
                 </p>
                 <p>
-                  2. Have a meeting → have AI assistant write follow up email → AI
-                  assistant has all of the context needed → writes amazing email →
-                  send directly from Bright
+                  2. Have a meeting → have AI assistant write follow up email →
+                  AI assistant has all of the context needed → writes amazing
+                  email → send directly from Bright
                 </p>
               </div>
             </div>
@@ -630,8 +652,8 @@ export default function LandingPage() {
                 One of my favorite use cases:
               </span>{" "}
               <span className="text-ink-700">
-                &quot;I&apos;m sick, move everything to Thursday.&quot; And Bright
-                will do it for you.
+                &quot;I&apos;m sick, move everything to Thursday.&quot; And
+                Bright will do it for you.
               </span>
             </p>
           </Wrap>
@@ -675,9 +697,10 @@ export default function LandingPage() {
               AI-draft your emails just like you wrote it.
             </Body>
             <Body>
-              We know that you likely have a system of record already. We&apos;ve
-              built integrations with Slack, Notion, Hubspot and Pipedrive. So
-              that you can get the summaries there with a few clicks.
+              We know that you likely have a system of record already.
+              We&apos;ve built integrations with Slack, Notion, Hubspot and
+              Pipedrive. So that you can get the summaries there with a few
+              clicks.
             </Body>
           </Wrap>
 
@@ -748,9 +771,9 @@ export default function LandingPage() {
               there. The context that many notes create over time is a goldmine.
             </Body>
             <Body>
-              When you ask the AI chat questions, we pull in all the context from
-              the pages. Wherever you are, you can always ask questions about any
-              meeting.
+              When you ask the AI chat questions, we pull in all the context
+              from the pages. Wherever you are, you can always ask questions
+              about any meeting.
             </Body>
 
             <div className="pt-4">
@@ -808,14 +831,14 @@ export default function LandingPage() {
             <SectionEyebrow tone="orange">Calendar &amp; Todos</SectionEyebrow>
             <SectionTitle>Organize your day on autopilot</SectionTitle>
             <p className="text-[15px] text-ink-500">
-              <span className="font-semibold text-ink-900">Replaces:</span> Gcal,
-              Things 3, Motion
+              <span className="font-semibold text-ink-900">Replaces:</span>{" "}
+              Gcal, Things 3, Motion
             </p>
             <Body className="pt-2">
               Combine action items from your calls with todos from eg Notion or
               Todoist in one place. From there, we use AI to schedule your day.
-              Whenever your plans change, we shuffle around your schedule to keep
-              you on track.
+              Whenever your plans change, we shuffle around your schedule to
+              keep you on track.
             </Body>
 
             <div className="grid gap-8 pt-6 sm:grid-cols-2">
@@ -853,7 +876,7 @@ export default function LandingPage() {
               <div key={item.name} className="flex flex-col gap-3">
                 <div className="flex items-start justify-between">
                   <Stars />
-                  <span className="flex size-5 items-center justify-center rounded-[5px] bg-ink-900 text-[11px] font-bold text-white">
+                  <span className="flex size-5 items-center justify-center rounded-[5px] bg-ink-900 text-[11px] font-bold text-canvas">
                     𝕏
                   </span>
                 </div>
@@ -909,7 +932,7 @@ export default function LandingPage() {
               </div>
 
               <div className="relative flex justify-center pt-12">
-                <ActionButton href="/auth?mode=signup">Get started</ActionButton>
+                <ActionButton href="/sign-up">Get started</ActionButton>
               </div>
             </div>
           </Wrap>
@@ -923,7 +946,8 @@ export default function LandingPage() {
             </h2>
             <p className="pb-4 text-center text-[14px] text-ink-500">
               If you can&apos;t find the answer to your question below, email us
-              at <span className="font-semibold text-ink-900">care@bright.so</span>
+              at{" "}
+              <span className="font-semibold text-ink-900">care@bright.so</span>
             </p>
             <FaqList items={faqs} />
           </Wrap>
@@ -952,13 +976,22 @@ export default function LandingPage() {
             Designed by the beach
           </span>
           <div className="flex flex-wrap items-center gap-6 text-[13px] text-ink-300">
-            <Link href="#" className="text-ink-300 no-underline hover:no-underline">
+            <Link
+              href="#"
+              className="text-ink-300 no-underline hover:no-underline"
+            >
               Privacy Policy
             </Link>
-            <Link href="#" className="text-ink-300 no-underline hover:no-underline">
+            <Link
+              href="#"
+              className="text-ink-300 no-underline hover:no-underline"
+            >
               Terms of use
             </Link>
-            <Link href="#" className="text-ink-300 no-underline hover:no-underline">
+            <Link
+              href="#"
+              className="text-ink-300 no-underline hover:no-underline"
+            >
               Imprint
             </Link>
             <span>© Bright 2026</span>
