@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@clerk/ui/themes/shadcn.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -136,6 +137,7 @@
     --color-canvas: #f5f5f6;
     --color-surface: #ffffff;
     --color-sunken: #f0f0f2;
+    --color-hover: #fafafb;
     --color-line: #e4e4e7;
     --color-line-strong: #d6d6db;
 
@@ -211,4 +213,91 @@
     --border: #e4e4e7;
     --input: #e4e4e7;
     --ring: #2e6bf0;
+}
+
+/* ---------------------------------------------------------------
+   Dark palette — Bright tokens inverted.
+   Must stay LAST in this file: the :root blocks above have the same
+   specificity as .dark, so source order decides the winner.
+   --------------------------------------------------------------- */
+.dark {
+    /* Canvas & surface — canvas is the base, surface lifts, sunken recedes. */
+    --color-canvas: #101013;
+    --color-surface: #17171b;
+    --color-sunken: #1e1e23;
+    --color-hover: #1c1c21;
+    --color-line: #2a2a31;
+    --color-line-strong: #3a3a44;
+
+    /* Ink — inverted ramp, 900 is the brightest. */
+    --color-ink-900: #f5f5f6;
+    --color-ink-700: #c8c8d0;
+    --color-ink-500: #8f8f99;
+    --color-ink-300: #5c5c66;
+
+    /* Accent — lifted for contrast on dark; tints become deep blues. */
+    --color-accent-700: #2e6bf0;
+    --color-accent-600: #3d78f5;
+    --color-accent-500: #4c86ff;
+    --color-accent-200: #1b2c50;
+    --color-accent-100: #16233f;
+    --color-accent-light: #8fb4fa;
+
+    /* Status — brighter marks, near-black tints. */
+    --color-positive: #35c07a;
+    --color-positive-ink: #7fe0ab;
+    --color-positive-tint: #10281c;
+    --color-attention: #f0b429;
+    --color-attention-ink: #ffd66b;
+    --color-attention-tint: #2b220e;
+    --color-critical: #f2645c;
+    --color-critical-strong: #ff7b73;
+
+    /* Elevation — shadows read as depth, not haze, on dark. */
+    --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-e2: 0 4px 14px rgba(0, 0, 0, 0.55);
+    --shadow-e3: 0 18px 46px rgba(0, 0, 0, 0.65);
+
+    /* Landing palette */
+    --color-page: #0b0b0e;
+    --color-sky-500: #3aa8f5;
+    --color-sky-600: #1d9bf0;
+    --color-eyebrow-green: #34d399;
+    --color-eyebrow-purple: #a78bfa;
+    --color-eyebrow-orange: #fb923c;
+    --color-mark-pink: #ff6b72;
+    --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Sidebar tokens remapped onto the dark Bright palette. */
+    --sidebar: #17171b;
+    --sidebar-foreground: #c8c8d0;
+    --sidebar-primary: #4c86ff;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #1e1e23;
+    --sidebar-accent-foreground: #f5f5f6;
+    --sidebar-border: #2a2a31;
+    --sidebar-ring: #4c86ff;
+
+    /* shadcn primitives aligned to the dark Bright values.
+       Clerk's shadcn theme reads these (colorBackground: var(--card),
+       colorForeground: var(--card-foreground), …), so overriding them
+       here is what keeps the Clerk card in step with the rest of the UI. */
+    --background: #101013;
+    --foreground: #f5f5f6;
+    --card: #17171b;
+    --card-foreground: #f5f5f6;
+    --popover: #17171b;
+    --popover-foreground: #f5f5f6;
+    --primary: #4c86ff;
+    --primary-foreground: #ffffff;
+    --secondary: #1e1e23;
+    --secondary-foreground: #f5f5f6;
+    --muted: #1e1e23;
+    --muted-foreground: #8f8f99;
+    --accent: #1e1e23;
+    --accent-foreground: #f5f5f6;
+    --destructive: #f2645c;
+    --border: #2a2a31;
+    --input: #2a2a31;
+    --ring: #4c86ff;
 }

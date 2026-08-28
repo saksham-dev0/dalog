@@ -3,16 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronsUpDown, LogOut, Rss, Settings, Terminal } from "lucide-react"
+import { Rss, Settings, Terminal } from "lucide-react"
+import { UserButton } from "@clerk/nextjs"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -28,9 +21,10 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
+import { useQuery } from "convex/react"
+
 import { GithubMark } from "@/components/dashboard/github-mark"
-import { WebhookPill } from "@/components/dashboard/status-pill"
-import { repos } from "@/lib/mock-data"
+import { api } from "@/convex/_generated/api"
 
 /* Design-system nav link: 14px / 600, radius md 10, sunken active + hover. */
 const navButtonClass =
@@ -52,11 +46,10 @@ const accountNav: NavItem[] = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
-function AppSidebar() {
+/** Connection comes from the layout; the watch count is a live Convex query. */
+function AppSidebar({ githubConnected }: { githubConnected: boolean }) {
   const pathname = usePathname()
-  const brokenWebhooks = repos.filter(
-    (repo) => repo.webhook === "broken"
-  ).length
+  const watchedCount = useQuery(api.repos.listWatched)?.length ?? 0
 
   // /dashboard only matches exactly; everything else matches its subtree.
   const isActive = (href: string) =>
@@ -82,7 +75,9 @@ function AppSidebar() {
                     dalog
                   </span>
                   <span className="truncate text-xs text-ink-300">
-                    {repos.length} repos connected
+                    {githubConnected
+                      ? `${watchedCount} ${watchedCount === 1 ? "repo" : "repos"} watched`
+                      : "GitHub not connected"}
                   </span>
                 </span>
               </Link>
@@ -151,72 +146,53 @@ function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        {/* Connection health lives here so a dead webhook is visible from any page. */}
-        {brokenWebhooks > 0 ? (
+        {/* Connection prompt lives here so it is visible from any page. */}
+        {githubConnected ? null : (
           <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-canvas p-4 group-data-[collapsible=icon]:hidden">
-            <WebhookPill status="broken" />
             <span className="text-[13px] leading-[1.5] text-ink-500">
-              {brokenWebhooks} repo stopped delivering pushes.
+              Connect GitHub to start drafting from your pushes.
             </span>
             <Link
               href="/dashboard/repos"
               className="text-[13px] font-bold text-accent-500 no-underline hover:no-underline"
             >
-              Reconnect →
+              Connect GitHub →
             </Link>
           </div>
-        ) : null}
+        )}
 
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  tooltip="Saksham Sharma"
-                  className="rounded-[10px]"
-                >
-                  <span className="flex aspect-square size-8 items-center justify-center rounded-full bg-accent-100 text-[11px] font-bold text-accent-600">
-                    SS
-                  </span>
-                  <span className="grid flex-1 text-left leading-tight">
-                    <span className="truncate text-[13px] font-bold text-ink-900">
-                      Saksham Sharma
-                    </span>
-                    <span className="truncate text-xs text-ink-300">
-                      @saksham-dev0
-                    </span>
-                  </span>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="right"
-                align="end"
-                className="w-56 rounded-[10px]"
+            {/* Clerk account switcher. Handles profile, adding/switching
+                accounts (multi-session), and sign out. */}
+            <div className="flex items-center rounded-[10px] p-1 group-data-[collapsible=icon]:justify-center">
+              <UserButton
+                showName
+                afterSwitchSessionUrl="/dashboard"
+                appearance={{
+                  elements: {
+                    rootBox: "w-full group-data-[collapsible=icon]:w-auto",
+                    userButtonTrigger:
+                      "w-full justify-start gap-2 rounded-[10px] px-2 py-1.5 hover:bg-sunken group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:px-0",
+                    userButtonOuterIdentifier:
+                      "text-[13px] font-bold text-ink-900 truncate group-data-[collapsible=icon]:hidden",
+                  },
+                }}
               >
-                <DropdownMenuLabel className="text-xs text-ink-300">
-                  Signed in with GitHub
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings">
-                    <Settings className="size-4" /> Settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/repos">
-                    <GithubMark className="size-4" /> Manage repos
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/auth?mode=signin">
-                    <LogOut className="size-4" /> Log out
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <UserButton.MenuItems>
+                  <UserButton.Link
+                    label="Settings"
+                    href="/dashboard/settings"
+                    labelIcon={<Settings className="size-4" />}
+                  />
+                  <UserButton.Link
+                    label="Manage repos"
+                    href="/dashboard/repos"
+                    labelIcon={<GithubMark className="size-4" />}
+                  />
+                </UserButton.MenuItems>
+              </UserButton>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

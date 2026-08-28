@@ -4,6 +4,9 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Plus, Search } from "lucide-react"
+import { UserButton } from "@clerk/nextjs"
+
+import { ThemeToggle } from "@/components/dashboard/theme-toggle"
 
 import { BrightButton } from "@/components/bright/button"
 import {
@@ -79,6 +82,7 @@ function DashboardTopbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <ThemeToggle />
         <Link
           href="/dashboard/repos"
           className="no-underline hover:no-underline"
@@ -91,6 +95,7 @@ function DashboardTopbar() {
             Connect a repo
           </BrightButton>
         </Link>
+        <UserButton />
       </div>
     </header>
   )

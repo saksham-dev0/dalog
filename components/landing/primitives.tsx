@@ -140,7 +140,7 @@ function MediaPlaceholder({
   return (
     <div
       className={cn(
-        "flex items-center justify-center overflow-hidden rounded-[12px] border border-line bg-[repeating-linear-gradient(135deg,#F5F5F6_0_10px,#EDEDEF_10px_20px)]",
+        "flex items-center justify-center overflow-hidden rounded-[12px] border border-line bg-[repeating-linear-gradient(135deg,var(--color-sunken)_0_10px,var(--color-line)_10px_20px)]",
         className
       )}
     >

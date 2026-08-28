@@ -30,7 +30,7 @@ function BrightDataTable({ rows }: { rows: MeetingRow[] }) {
       {rows.map((row) => (
         <div
           key={row.name}
-          className={`${columns} items-center border-b border-sunken px-[22px] py-[15px] hover:bg-[#FAFAFB]`}
+          className={`${columns} items-center border-b border-sunken px-[22px] py-[15px] hover:bg-hover`}
         >
           <span className="text-sm font-semibold text-ink-900">{row.name}</span>
           <span className="text-sm text-ink-500">{row.owner}</span>
@@ -53,7 +53,7 @@ function BrightDataTable({ rows }: { rows: MeetingRow[] }) {
               key={label}
               className={
                 label === "1"
-                  ? "cursor-pointer rounded-lg border-none bg-ink-900 px-3 py-1.5 text-[13px] font-bold text-white"
+                  ? "cursor-pointer rounded-lg border-none bg-ink-900 px-3 py-1.5 text-[13px] font-bold text-canvas"
                   : "cursor-pointer rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-bold text-ink-500 hover:bg-canvas"
               }
             >

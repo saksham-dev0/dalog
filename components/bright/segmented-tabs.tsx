@@ -24,7 +24,7 @@ function SegmentedTabs({ tabs }: { tabs: SegmentedTab[] }) {
             className={cn(
               "cursor-pointer rounded-full px-5 py-2 text-sm font-bold transition-colors",
               active === i
-                ? "bg-surface text-ink-900 shadow-[0_1px_2px_rgba(16,16,19,0.08)]"
+                ? "bg-surface text-ink-900 shadow-e1"
                 : "text-ink-500 hover:text-ink-900"
             )}
           >

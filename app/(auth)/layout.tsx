@@ -1,6 +1,5 @@
 import { Eyebrow } from "@/components/bright/badge"
 import { Logo } from "@/components/bright/logo"
-import { AuthPanel, type AuthMode } from "@/components/site/auth-panel"
 
 export const metadata = {
   title: "Sign in · Bright",
@@ -13,14 +12,12 @@ const highlights = [
   "One summary, written back to every tool",
 ]
 
-export default async function AuthPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
-}) {
-  const mode = (await searchParams).mode
-  const initialMode: AuthMode = mode === "signup" ? "signup" : "signin"
-
+/** Shared shell for the Clerk auth routes: brand rail + centred form column. */
+export default function AuthLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
     <div className="grid min-h-svh bg-canvas text-ink-900 lg:grid-cols-2">
       {/* Brand rail */}
@@ -46,7 +43,9 @@ export default async function AuthPage({
           </div>
 
           <div className="flex max-w-[420px] flex-col gap-[14px] rounded-[18px] border border-line bg-canvas p-[26px]">
-            <div className="flex gap-[3px] text-[15px] text-attention">★★★★★</div>
+            <div className="flex gap-[3px] text-[15px] text-attention">
+              ★★★★★
+            </div>
             <p className="text-[15px] leading-[1.6] text-ink-700">
               “We stopped assigning a note-taker. The recap is in the channel
               before the call ends.”
@@ -68,12 +67,12 @@ export default async function AuthPage({
         </span>
       </aside>
 
-      {/* Form column */}
+      {/* Form column — Clerk's card renders here. */}
       <main className="flex flex-col items-center justify-center gap-8 px-6 py-16">
         <div className="lg:hidden">
           <Logo size="lg" />
         </div>
-        <AuthPanel initialMode={initialMode} />
+        {children}
       </main>
     </div>
   )

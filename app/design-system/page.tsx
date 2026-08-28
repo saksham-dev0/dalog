@@ -47,7 +47,7 @@ export default function Page() {
         <h1 className="max-w-[780px] text-[52px] leading-[1.02] font-extrabold tracking-[-0.035em] text-balance">
           A marketing design system for product pages
         </h1>
-        <p className="max-w-[620px] text-[18px] leading-[1.55] text-ink-500 text-pretty">
+        <p className="max-w-[620px] text-[18px] leading-[1.55] text-pretty text-ink-500">
           Tokens and components extracted from the reference layout: a light
           neutral canvas, white elevated surfaces, dense bold headlines, and a
           single blue action color.
@@ -113,11 +113,17 @@ export default function Page() {
       <Section>
         <SectionHeader index="03" title="Radius, elevation, spacing" />
         <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5">
-          <Surface elevation="none" className="flex flex-col gap-[18px] p-[22px]">
+          <Surface
+            elevation="none"
+            className="flex flex-col gap-[18px] p-[22px]"
+          >
             <SpecLabel>Radius</SpecLabel>
             <div className="flex flex-wrap items-end gap-[14px]">
               {radii.map((r) => (
-                <div key={r.label} className="flex flex-col items-center gap-1.5">
+                <div
+                  key={r.label}
+                  className="flex flex-col items-center gap-1.5"
+                >
                   <div
                     className={`size-[58px] border border-line bg-canvas ${r.className}`}
                   />
@@ -129,7 +135,10 @@ export default function Page() {
             </div>
           </Surface>
 
-          <Surface elevation="none" className="flex flex-col gap-[18px] p-[22px]">
+          <Surface
+            elevation="none"
+            className="flex flex-col gap-[18px] p-[22px]"
+          >
             <SpecLabel>Elevation</SpecLabel>
             <div className="flex flex-wrap gap-4">
               {elevations.map((e) => (
@@ -146,7 +155,10 @@ export default function Page() {
             </span>
           </Surface>
 
-          <Surface elevation="none" className="flex flex-col gap-[18px] p-[22px]">
+          <Surface
+            elevation="none"
+            className="flex flex-col gap-[18px] p-[22px]"
+          >
             <SpecLabel>Spacing · 4px base</SpecLabel>
             <div className="flex flex-col gap-[10px]">
               {spacingScale.map((s) => (
@@ -174,7 +186,10 @@ export default function Page() {
 
         <div className="flex flex-col gap-[14px]">
           <SpecLabel>Buttons</SpecLabel>
-          <Surface elevation="none" className="flex flex-col gap-[22px] p-[26px]">
+          <Surface
+            elevation="none"
+            className="flex flex-col gap-[22px] p-[26px]"
+          >
             <div className="flex flex-wrap items-center gap-3">
               <BrightButton>Get started</BrightButton>
               <BrightButton variant="secondary">Book a demo</BrightButton>
@@ -246,7 +261,9 @@ export default function Page() {
           </Surface>
 
           <Surface className="flex flex-col gap-[14px] p-[26px]">
-            <div className="flex gap-[3px] text-[15px] text-attention">★★★★★</div>
+            <div className="flex gap-[3px] text-[15px] text-attention">
+              ★★★★★
+            </div>
             <p className="text-[15px] leading-[1.6] text-ink-700">
               “Quote cards carry the star row on top, the quote in ink/700, and
               the attribution pinned to the bottom of the card.”
@@ -286,8 +303,11 @@ export default function Page() {
 
         <div className="flex flex-col gap-[14px]">
           <SpecLabel>Media frame &amp; logo strip</SpecLabel>
-          <Surface elevation="none" className="flex flex-col gap-[22px] p-[26px]">
-            <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[14px] border border-line bg-[repeating-linear-gradient(135deg,#F5F5F6_0_10px,#EDEDEF_10px_20px)] shadow-e3">
+          <Surface
+            elevation="none"
+            className="flex flex-col gap-[22px] p-[26px]"
+          >
+            <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[14px] border border-line bg-[repeating-linear-gradient(135deg,var(--color-sunken)_0_10px,var(--color-line)_10px_20px)] shadow-e3">
               <span className="rounded-full border border-line bg-surface px-[14px] py-1.5 font-mono text-xs text-ink-500">
                 product image · 16:9
               </span>

@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs"
 
 import { BrightButton } from "@/components/bright/button"
 import { Logo } from "@/components/bright/logo"
@@ -40,20 +41,34 @@ function SiteHeader() {
           </nav>
         </div>
         <div className="flex items-center gap-[10px]">
-          <Link href="/auth?mode=signin" className="no-underline hover:no-underline">
-            <BrightButton
-              variant="ghost"
-              size="sm"
-              className="px-3 py-[9px] text-sm"
-            >
-              Log in
-            </BrightButton>
-          </Link>
-          <Link href="/auth?mode=signup" className="no-underline hover:no-underline">
-            <BrightButton size="sm" className="px-[18px] py-[9px] text-sm">
-              Start free
-            </BrightButton>
-          </Link>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <BrightButton
+                variant="ghost"
+                size="sm"
+                className="px-3 py-[9px] text-sm"
+              >
+                Log in
+              </BrightButton>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <BrightButton size="sm" className="px-[18px] py-[9px] text-sm">
+                Start free
+              </BrightButton>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <Link href="/dashboard" className="no-underline hover:no-underline">
+              <BrightButton
+                variant="ghost"
+                size="sm"
+                className="px-3 py-[9px] text-sm"
+              >
+                Dashboard
+              </BrightButton>
+            </Link>
+            <UserButton />
+          </Show>
         </div>
       </div>
     </header>

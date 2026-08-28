@@ -31,7 +31,7 @@ function BrightDialog({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[440px] flex-col gap-[14px] rounded-[18px] bg-surface p-7 shadow-[0_18px_46px_rgba(16,16,19,0.22)]"
+        className="flex w-full max-w-[440px] flex-col gap-[14px] rounded-[18px] bg-surface p-7 shadow-e3"
       >
         <div className="flex items-start justify-between gap-4">
           <h3 className="text-[20px] font-extrabold tracking-[-0.02em]">
