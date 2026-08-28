@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as content from "../content.js";
 import type * as crons from "../crons.js";
+import type * as gemini from "../gemini.js";
 import type * as github from "../github.js";
 import type * as http from "../http.js";
 import type * as repos from "../repos.js";
@@ -21,7 +23,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  content: typeof content;
   crons: typeof crons;
+  gemini: typeof gemini;
   github: typeof github;
   http: typeof http;
   repos: typeof repos;

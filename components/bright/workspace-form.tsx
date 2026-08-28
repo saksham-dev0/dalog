@@ -21,23 +21,39 @@ function WorkspaceForm() {
 
   return (
     <>
-      <Surface elevation="none" className="flex max-w-[620px] flex-col gap-[22px] p-[30px]">
+      <Surface
+        elevation="none"
+        className="flex max-w-[620px] flex-col gap-[22px] p-[30px]"
+      >
         <div className="grid gap-[18px] sm:grid-cols-2">
           <div className="flex flex-col gap-[7px]">
-            <label htmlFor="full-name" className="text-[13px] font-bold text-ink-900">
+            <label
+              htmlFor="full-name"
+              className="text-[13px] font-bold text-ink-900"
+            >
               Full name
             </label>
-            <input id="full-name" placeholder="Jane Mercer" className={fieldClass} />
+            <input
+              id="full-name"
+              placeholder="Jane Mercer"
+              className={fieldClass}
+            />
           </div>
           <div className="flex flex-col gap-[7px]">
-            <label htmlFor="work-email" className="text-[13px] font-bold text-ink-900">
+            <label
+              htmlFor="work-email"
+              className="text-[13px] font-bold text-ink-900"
+            >
               Work email
             </label>
             <input
               id="work-email"
               defaultValue="jane@"
               aria-invalid
-              className={cn(fieldClass, "border-critical focus:border-critical focus:shadow-none")}
+              className={cn(
+                fieldClass,
+                "border-critical focus:border-critical focus:shadow-none"
+              )}
             />
             <span className="text-xs text-critical">
               Enter a complete email address.
@@ -46,7 +62,10 @@ function WorkspaceForm() {
         </div>
 
         <div className="flex flex-col gap-[7px]">
-          <label htmlFor="team-size" className="text-[13px] font-bold text-ink-900">
+          <label
+            htmlFor="team-size"
+            className="text-[13px] font-bold text-ink-900"
+          >
             Team size
           </label>
           <select id="team-size" className={cn(fieldClass, "appearance-none")}>
@@ -58,7 +77,10 @@ function WorkspaceForm() {
         </div>
 
         <div className="flex flex-col gap-[7px]">
-          <label htmlFor="automate" className="text-[13px] font-bold text-ink-900">
+          <label
+            htmlFor="automate"
+            className="text-[13px] font-bold text-ink-900"
+          >
             What are you hoping to automate?
           </label>
           <textarea
@@ -83,12 +105,16 @@ function WorkspaceForm() {
               <span
                 className={cn(
                   "flex size-[18px] items-center justify-center rounded-[5px] border text-xs text-white",
-                  checked ? "border-accent-500 bg-accent-500" : "border-line-strong bg-surface"
+                  checked
+                    ? "border-accent-500 bg-accent-500"
+                    : "border-line-strong bg-surface"
                 )}
               >
                 {checked ? "✓" : ""}
               </span>
-              <span className="text-sm text-ink-700">Email me the weekly digest</span>
+              <span className="text-sm text-ink-700">
+                Email me the weekly digest
+              </span>
             </button>
 
             <div className="flex gap-4">
@@ -127,12 +153,16 @@ function WorkspaceForm() {
               <span
                 className={cn(
                   "flex h-[23px] w-10 rounded-full p-[3px] transition-colors duration-150",
-                  switchOn ? "justify-end bg-accent-500" : "justify-start bg-line-strong"
+                  switchOn
+                    ? "justify-end bg-accent-500"
+                    : "justify-start bg-line-strong"
                 )}
               >
                 <span className="size-[17px] rounded-full bg-white shadow-[0_1px_2px_rgba(16,16,19,0.2)]" />
               </span>
-              <span className="text-sm text-ink-700">Auto-join calendar events</span>
+              <span className="text-sm text-ink-700">
+                Auto-join calendar events
+              </span>
             </button>
           </div>
         </div>

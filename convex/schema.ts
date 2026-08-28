@@ -8,6 +8,26 @@ export const eventKind = v.union(
   v.literal("branch")
 )
 
+export const channel = v.union(
+  v.literal("x"),
+  v.literal("linkedin"),
+  v.literal("reddit"),
+  v.literal("blog"),
+  v.literal("video")
+)
+
+export const draftStatus = v.union(
+  v.literal("pending"),
+  v.literal("reading"),
+  v.literal("researching"),
+  // Scan done: the model has the diff and the format research, and is waiting
+  // for the user to ask for the posts.
+  v.literal("scanned"),
+  v.literal("writing"),
+  v.literal("ready"),
+  v.literal("error")
+)
+
 export default defineSchema({
   /**
    * One row per repo a user asked dalog to watch. `ownerToken` is the Clerk
@@ -66,4 +86,50 @@ export default defineSchema({
     .index("by_repo_and_externalId", ["repo", "externalId"])
     .index("by_owner_and_occurredAt", ["ownerToken", "occurredAt"])
     .index("by_repo_and_occurredAt", ["repo", "occurredAt"]),
+
+  /**
+   * One drafting run over a slice of repo activity: what the model read, what
+   * it learned about the format, and the pieces it wrote. `version` bumps on
+   * every regeneration so a stale write from an old run can be dropped.
+   */
+  contentDrafts: defineTable({
+    repo: v.id("watchedRepos"),
+    ownerToken: v.string(),
+    fullName: v.string(),
+    headline: v.string(),
+    status: draftStatus,
+    /** The one commit, PR, merge or branch this draft is about. */
+    sourceEvent: v.optional(v.id("repoEvents")),
+    /** Free-text the user adds; the rewrite is steered by it. */
+    context: v.optional(v.string()),
+    /** Commits, PRs and diff excerpts the model was given. */
+    sourceDigest: v.optional(v.string()),
+    /** What the grounded research pass found about format and virality. */
+    research: v.optional(v.string()),
+    researchSources: v.optional(v.array(v.string())),
+    /** Sibling events given as surrounding context. */
+    sourceEvents: v.array(v.id("repoEvents")),
+    model: v.string(),
+    version: v.number(),
+    workflowId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerToken"])
+    .index("by_repo", ["repo"])
+    .index("by_sourceEvent", ["sourceEvent"]),
+
+  /** One row per channel, so an edit to the blog post never rewrites the rest. */
+  contentPieces: defineTable({
+    draft: v.id("contentDrafts"),
+    ownerToken: v.string(),
+    channel,
+    body: v.string(),
+    /** Set when the user edited the text by hand. */
+    editedByUser: v.boolean(),
+    version: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_draft", ["draft"])
+    .index("by_draft_and_channel", ["draft", "channel"]),
 })

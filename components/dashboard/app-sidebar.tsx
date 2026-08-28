@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Rss, Settings, Terminal } from "lucide-react"
+import { Rss, Settings, Sparkles, Terminal } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 
 import {
@@ -39,6 +39,7 @@ type NavItem = {
 
 const workNav: NavItem[] = [
   { label: "Activity", href: "/dashboard", icon: Rss, badge: "3" },
+  { label: "Drafts", href: "/dashboard/drafts", icon: Sparkles },
   { label: "Repos", href: "/dashboard/repos", icon: GithubMark },
 ]
 

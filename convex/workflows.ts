@@ -2,6 +2,7 @@ import { v } from "convex/values"
 import { WorkflowManager } from "@convex-dev/workflow"
 
 import { components, internal } from "./_generated/api"
+import { CHANNELS } from "./content"
 
 /** Gap between polls. Webhooks cover the instant path; this is the safety net. */
 const POLL_INTERVAL_MS = 60_000
@@ -55,6 +56,114 @@ export const syncRepoWorkflow = workflow
     await step.runMutation(internal.repos.continueWatching, {
       repoId: args.repoId,
     })
+
+    return null
+  })
+
+/**
+ * Background scan of one commit, PR, merge or branch: pull the real diff, then
+ * research what the platforms are rewarding right now. Stops at `scanned` —
+ * writing waits for the user to ask for it.
+ */
+export const scanEventWorkflow = workflow
+  .define({
+    args: { draftId: v.id("contentDrafts"), version: v.number() },
+    returns: v.null(),
+  })
+  .handler(async (step, args): Promise<null> => {
+    const setStatus = async (
+      status: "reading" | "researching" | "scanned" | "error",
+      error?: string
+    ) => {
+      await step.runMutation(internal.content.setDraftStatus, {
+        draftId: args.draftId,
+        version: args.version,
+        status,
+        error,
+      })
+    }
+
+    try {
+      await setStatus("reading")
+      await step.runAction(
+        internal.gemini.buildSourceDigest,
+        { draftId: args.draftId, version: args.version },
+        { retry: true }
+      )
+
+      await setStatus("researching")
+      await step.runAction(
+        internal.gemini.researchFormats,
+        { draftId: args.draftId, version: args.version },
+        { retry: true }
+      )
+
+      await setStatus("scanned")
+    } catch (error) {
+      await setStatus(
+        "error",
+        error instanceof Error ? error.message : "Scan failed"
+      )
+    }
+
+    return null
+  })
+
+/**
+ * Writes the five pieces from a scan that already landed. `revise: true` means
+ * the user added context, so each piece is rewritten from its previous text.
+ */
+export const writeContentWorkflow = workflow
+  .define({
+    args: {
+      draftId: v.id("contentDrafts"),
+      version: v.number(),
+      revise: v.optional(v.boolean()),
+    },
+    returns: v.null(),
+  })
+  .handler(async (step, args): Promise<null> => {
+    const setStatus = async (
+      status: "writing" | "ready" | "error",
+      error?: string
+    ) => {
+      await step.runMutation(internal.content.setDraftStatus, {
+        draftId: args.draftId,
+        version: args.version,
+        status,
+        error,
+      })
+    }
+
+    try {
+      await setStatus("writing")
+      const previous: Record<string, string> = await step.runQuery(
+        internal.content.getPieceBodies,
+        { draftId: args.draftId }
+      )
+
+      await Promise.all(
+        CHANNELS.map((channel) =>
+          step.runAction(
+            internal.gemini.writeChannel,
+            {
+              draftId: args.draftId,
+              version: args.version,
+              channel,
+              previous: args.revise ? previous[channel] : undefined,
+            },
+            { retry: true }
+          )
+        )
+      )
+
+      await setStatus("ready")
+    } catch (error) {
+      await setStatus(
+        "error",
+        error instanceof Error ? error.message : "Generation failed"
+      )
+    }
 
     return null
   })

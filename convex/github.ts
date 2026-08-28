@@ -1,7 +1,7 @@
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import type { Id } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import { internalAction, type ActionCtx } from "./_generated/server"
 
 const GITHUB_API = "https://api.github.com"
@@ -296,6 +296,21 @@ export const teardownWatch = internalAction({
     }
 
     return null
+  },
+})
+
+/** Internal only: the digest builder needs the same token to read diffs. */
+export const getTokenForRepo = internalAction({
+  args: { repoId: v.id("watchedRepos") },
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> => {
+    const repo: Doc<"watchedRepos"> | null = await ctx.runQuery(
+      internal.repos.getRepo,
+      { repoId: args.repoId }
+    )
+    if (!repo) throw new Error("Repo not found")
+
+    return await getGithubToken(repo.clerkUserId)
   },
 })
 

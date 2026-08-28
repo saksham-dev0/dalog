@@ -38,7 +38,11 @@ function BrightNavBar() {
         </div>
       </div>
       <div className="flex items-center gap-[10px]">
-        <BrightButton variant="ghost" size="sm" className="px-3 py-[9px] text-sm">
+        <BrightButton
+          variant="ghost"
+          size="sm"
+          className="px-3 py-[9px] text-sm"
+        >
           Log in
         </BrightButton>
         <BrightButton size="sm" className="px-[18px] py-[9px] text-sm">

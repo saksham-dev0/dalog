@@ -50,10 +50,19 @@ function BrightDialog({
           change this later in workspace settings.
         </p>
         <div className="flex justify-end gap-[10px] pt-1.5">
-          <BrightButton variant="secondary" size="sm" onClick={onClose} className="px-[18px] py-[9px] text-sm">
+          <BrightButton
+            variant="secondary"
+            size="sm"
+            onClick={onClose}
+            className="px-[18px] py-[9px] text-sm"
+          >
             Later
           </BrightButton>
-          <BrightButton size="sm" onClick={onClose} className="px-[18px] py-[9px] text-sm">
+          <BrightButton
+            size="sm"
+            onClick={onClose}
+            className="px-[18px] py-[9px] text-sm"
+          >
             Connect calendar
           </BrightButton>
         </div>
