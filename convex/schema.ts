@@ -100,8 +100,16 @@ export default defineSchema({
     status: draftStatus,
     /** The one commit, PR, merge or branch this draft is about. */
     sourceEvent: v.optional(v.id("repoEvents")),
-    /** Free-text the user adds; the rewrite is steered by it. */
+    /**
+     * The working context every writing pass reads: the model's own brief on
+     * the change, merged with whatever the author added. Written by the scan,
+     * so it is never empty once a draft is scanned.
+     */
     context: v.optional(v.string()),
+    /** The scan's grounded understanding of the change, on its own. */
+    brief: v.optional(v.string()),
+    /** Raw free-text the author added, kept separately so merges stay idempotent. */
+    userContext: v.optional(v.string()),
     /** Commits, PRs and diff excerpts the model was given. */
     sourceDigest: v.optional(v.string()),
     /** What the grounded research pass found about format and virality. */

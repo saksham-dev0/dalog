@@ -123,8 +123,11 @@ export const openEventDraft = mutation({
       .query("contentDrafts")
       .withIndex("by_sourceEvent", (q) => q.eq("sourceEvent", event._id))
       .first()
-    // A finished or in-flight scan is reused; only a failed one is retried.
-    if (existing && existing.status !== "error") return existing._id
+    // A finished or in-flight scan is reused. A failed one, or one from before
+    // the scan produced a brief, is scanned again.
+    if (existing && existing.status !== "error" && existing.brief) {
+      return existing._id
+    }
 
     const siblings = await siblingEvents(ctx, event)
     const draftId =
@@ -225,6 +228,26 @@ export const maybeScanMergedEvent = internalMutation({
   },
 })
 
+/**
+ * Saves the author's context without writing anything — used before the first
+ * generation, so the posts are written with it from the start.
+ */
+export const setUserContext = mutation({
+  args: { draftId: v.id("contentDrafts"), context: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const draft = await requireOwnedDraft(ctx, args.draftId)
+    const userContext = args.context.trim() || undefined
+
+    await ctx.db.patch("contentDrafts", draft._id, {
+      userContext,
+      context: mergeContext(draft.brief, userContext),
+    })
+
+    return null
+  },
+})
+
 /** Adds the user's own context and rewrites every piece against it. */
 export const addContextAndRewrite = mutation({
   args: { draftId: v.id("contentDrafts"), context: v.string() },
@@ -233,8 +256,11 @@ export const addContextAndRewrite = mutation({
     const draft = await requireOwnedDraft(ctx, args.draftId)
     const version = draft.version + 1
 
+    const userContext = args.context.trim() || undefined
     await ctx.db.patch("contentDrafts", draft._id, {
-      context: args.context.trim() || undefined,
+      userContext,
+      // Never drop the scan's brief — the note is added to it, not swapped in.
+      context: mergeContext(draft.brief, userContext),
       status: "writing",
       version,
       error: undefined,
@@ -336,6 +362,23 @@ export const getDraftSources = internalQuery({
   },
 })
 
+/**
+ * The single string every writing pass reads. Always contains the scan's brief;
+ * the author's own note is appended under its own heading so the model can tell
+ * verified facts from author intent.
+ */
+export function mergeContext(
+  brief: string | undefined,
+  userContext: string | undefined,
+): string {
+  const sections: string[] = []
+  if (brief) sections.push(`WHAT THIS CHANGE IS (verified against the diff):\n${brief}`)
+  if (userContext)
+    sections.push(`AUTHOR'S OWN CONTEXT (intent and framing — trust it):\n${userContext}`)
+
+  return sections.join("\n\n")
+}
+
 /** Previous bodies, keyed by channel, so a rewrite can revise instead of restart. */
 export const getPieceBodies = internalQuery({
   args: { draftId: v.id("contentDrafts") },
@@ -390,6 +433,29 @@ export const saveSourceDigest = internalMutation({
 
     await ctx.db.patch("contentDrafts", draft._id, {
       sourceDigest: args.sourceDigest,
+      headline: args.headline ?? draft.headline,
+    })
+
+    return null
+  },
+})
+
+/** The scan's understanding of the change; also refreshes the merged context. */
+export const saveBrief = internalMutation({
+  args: {
+    draftId: v.id("contentDrafts"),
+    version: v.number(),
+    brief: v.string(),
+    headline: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const draft = await ctx.db.get("contentDrafts", args.draftId)
+    if (!draft || draft.version !== args.version) return null
+
+    await ctx.db.patch("contentDrafts", draft._id, {
+      brief: args.brief,
+      context: mergeContext(args.brief, draft.userContext),
       headline: args.headline ?? draft.headline,
     })
 

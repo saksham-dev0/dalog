@@ -255,7 +255,57 @@ export const buildSourceDigest = internalAction({
 })
 
 /* -------------------------------------------------------------------------- */
-/* Step 2 — research what actually performs on each platform                   */
+/* Step 2 — turn the raw diff into a grounded brief                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Compresses the diff into the brief every writing pass reads. Doing this once,
+ * with an explicit "unknowns" section, is what keeps the five posts from
+ * inventing motivation or numbers the diff never showed.
+ */
+export const buildChangeBrief = internalAction({
+  args: { draftId: v.id("contentDrafts"), version: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const draft: Doc<"contentDrafts"> | null = await ctx.runQuery(
+      internal.content.getDraftInternal,
+      { draftId: args.draftId }
+    )
+    if (!draft || draft.version !== args.version) return null
+
+    const { text } = await callGemini(
+      `Read this change and write a factual brief for a writer who will turn it into posts.
+
+CHANGE (the only source of truth):
+${draft.sourceDigest ?? "(no diff available)"}
+
+Write these sections, plainly, no preamble:
+WHAT CHANGED — the concrete change, in 2-4 sentences, naming the real modules/files/functions.
+HOW IT WORKS — the mechanism, specific enough that a developer could argue with it.
+WHY (STATED) — only motivation actually stated in the commit message, PR description or code comments. If none is stated, write "not stated in the change".
+USER-FACING IMPACT — what someone using this would notice. If the diff does not show one, say so.
+NUMBERS — any real figures present (file counts, line counts, timings, limits). Never estimate or invent one.
+UNKNOWNS — what a reader would want to know that this change does not answer. Be honest here; the writer must not guess at these.
+
+Rules: every claim must be traceable to the change above. Do not speculate about performance, adoption, or motivation. Do not use marketing language.`,
+      {
+        system:
+          "You extract facts from diffs. You never infer intent that is not written down, and you never invent numbers.",
+      }
+    )
+
+    await ctx.runMutation(internal.content.saveBrief, {
+      draftId: args.draftId,
+      version: args.version,
+      brief: text,
+    })
+
+    return null
+  },
+})
+
+/* -------------------------------------------------------------------------- */
+/* Step 3 — research what actually performs on each platform                   */
 /* -------------------------------------------------------------------------- */
 
 export const researchFormats = internalAction({
@@ -297,7 +347,7 @@ Be specific and current. No preamble.`,
 })
 
 /* -------------------------------------------------------------------------- */
-/* Step 3 — write one channel                                                  */
+/* Step 4 — write one channel                                                  */
 /* -------------------------------------------------------------------------- */
 
 const CHANNEL_BRIEF: Record<Channel, string> = {
@@ -318,14 +368,17 @@ function writePrompt(
     ``,
     `SUBJECT: ${draft.headline}. Write about this one change only — the surrounding activity is context, not the topic.`,
     ``,
-    `WHAT CHANGED (source of truth — never invent anything not supported by this):`,
+    `CONTEXT (the brief the scan produced, plus anything the author told us — this is the source of truth):`,
+    draft.context ?? draft.brief ?? "(no brief available)",
+    ``,
+    `RAW CHANGE (cite specifics from here; never state anything it does not support):`,
     draft.sourceDigest ?? "(no diff available; rely on the activity list only)",
     ``,
     `PLATFORM RESEARCH (current formats that perform):`,
     draft.research ?? "(no research available)",
     ``,
-    draft.context
-      ? `AUTHOR CONTEXT (highest priority — rewrite to honor this):\n${draft.context}\n`
+    draft.userContext
+      ? `AUTHOR CONTEXT (highest priority — honor this framing exactly):\n${draft.userContext}\n`
       : ``,
     previous
       ? `PREVIOUS VERSION (revise it against the author context; keep what still works):\n${previous}\n`
@@ -333,7 +386,7 @@ function writePrompt(
     `TASK: write the ${channelId} piece.`,
     CHANNEL_BRIEF[channelId],
     ``,
-    `Rules: only claims the diff supports; no placeholder text; no "as an AI"; no meta commentary. Output the post text only.`,
+    `Rules: every factual claim must trace to the context or the raw change above — if the brief lists it under UNKNOWNS, do not assert it. No invented numbers, no invented motivation, no placeholder text, no meta commentary. Output the post text only.`,
   ]
     .filter(Boolean)
     .join("\n")

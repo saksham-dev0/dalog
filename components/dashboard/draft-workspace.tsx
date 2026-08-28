@@ -68,6 +68,42 @@ function StatusPill({ draft }: { draft: Doc<"contentDrafts"> }) {
   )
 }
 
+/** One clamped line, expandable — long text should not own the page. */
+function ReadMore({
+  children,
+  className,
+  moreLabel = "Read more",
+}: {
+  children: React.ReactNode
+  className?: string
+  moreLabel?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  // Short text needs no toggle — one line is already the whole thing.
+  const needsToggle = typeof children !== "string" || children.length > 90
+
+  if (!needsToggle) {
+    return <p className={className}>{children}</p>
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <p
+        className={cn(open ? "whitespace-pre-wrap" : "line-clamp-1", className)}
+      >
+        {children}
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="cursor-pointer bg-transparent text-[12px] font-bold text-ink-500 hover:text-accent-500"
+      >
+        {open ? "Show less" : moreLabel}
+      </button>
+    </div>
+  )
+}
+
 /**
  * The drafting workspace for one run: what the model read, what it wrote per
  * channel, and the context box that rewrites everything. Every read is a live
@@ -78,6 +114,7 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
   const updatePiece = useMutation(api.content.updatePiece)
   const rewrite = useMutation(api.content.addContextAndRewrite)
   const generate = useMutation(api.content.generatePieces)
+  const saveContext = useMutation(api.content.setUserContext)
 
   const [active, setActive] = React.useState<Channel>("x")
   const [context, setContext] = React.useState("")
@@ -165,12 +202,19 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
     if (!context.trim()) return
     setRewriting(true)
     try {
-      await rewrite({ draftId: draft._id, context })
+      if (hasPieces) {
+        await rewrite({ draftId: draft._id, context })
+        setEdited(null)
+        toast.success("Rewriting all five drafts with your context")
+      } else {
+        await saveContext({ draftId: draft._id, context })
+        toast.success("Context saved", {
+          description: "It goes into every draft when you generate.",
+        })
+      }
       setContext("")
-      setEdited(null)
-      toast.success("Rewriting all five drafts with your context")
     } catch (error) {
-      toast.error("Could not start the rewrite", {
+      toast.error("Could not save your context", {
         description:
           error instanceof Error ? error.message : "Please try again.",
       })
@@ -252,6 +296,15 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
                   ))}
                 </ul>
               </div>
+
+              {draft.brief ? (
+                <div className="flex flex-col gap-2">
+                  <SpecLabel>The model&apos;s brief</SpecLabel>
+                  <p className="text-[13px] leading-[1.6] whitespace-pre-wrap text-ink-500">
+                    {draft.brief}
+                  </p>
+                </div>
+              ) : null}
 
               {draft.sourceDigest ? (
                 <div className="flex flex-col gap-2">
@@ -468,20 +521,27 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
         </Surface>
       ) : null}
 
-      {/* Context → rewrite. The author always knows what the diff can't show. */}
-      {hasPieces ? (
+      {/* Context. Before the first generation it is simply saved; afterwards it
+          triggers a rewrite of all five pieces. */}
+      {hasPieces || draft.status === "scanned" ? (
         <Surface className="flex flex-col gap-4 p-[22px]">
           <div className="flex flex-col gap-1">
             <SpecLabel>Add context</SpecLabel>
-            <p className="text-[13px] leading-[1.6] text-ink-300">
-              Why the change happened, who it is for, what to emphasize or drop.
-              All five drafts are rewritten against it.
-            </p>
+            <ReadMore className="text-[13px] leading-[1.6] text-ink-300">
+              What the diff cannot show. Stored with the scan&apos;s brief, so
+              every draft is written against both — and all five are rewritten
+              when you add to it.
+            </ReadMore>
           </div>
-          {draft.context ? (
-            <p className="rounded-[12px] bg-sunken p-3 text-[13px] leading-[1.6] text-ink-500">
-              {draft.context}
-            </p>
+          {draft.userContext ? (
+            <div className="rounded-[12px] bg-sunken p-3">
+              <ReadMore
+                className="text-[13px] leading-[1.6] text-ink-500"
+                moreLabel="Read full context"
+              >
+                {draft.userContext}
+              </ReadMore>
+            </div>
           ) : null}
           <textarea
             value={context}

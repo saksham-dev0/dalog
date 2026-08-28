@@ -91,6 +91,12 @@ export const scanEventWorkflow = workflow
         { retry: true }
       )
 
+      await step.runAction(
+        internal.gemini.buildChangeBrief,
+        { draftId: args.draftId, version: args.version },
+        { retry: true }
+      )
+
       await setStatus("researching")
       await step.runAction(
         internal.gemini.researchFormats,
