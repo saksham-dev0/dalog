@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 import { toast } from "sonner"
 
 import { BrightBadge } from "@/components/bright/badge"
@@ -25,6 +26,12 @@ import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { cn } from "@/lib/utils"
 import { repoShortName, repoStyles } from "@/lib/repo-color"
+
+/**
+ * The projection `listWatched` returns, not the stored document — derived from
+ * the query so it cannot drift from the server.
+ */
+type WatchedRepo = FunctionReturnType<typeof api.repos.listWatched>[number]
 
 type EventKind = Doc<"repoEvents">["kind"]
 type GroupBy = "day" | "repo"
@@ -312,7 +319,7 @@ function FilterBar({
   search,
   setSearch,
 }: {
-  repos: Doc<"watchedRepos">[]
+  repos: WatchedRepo[]
   repo: Id<"watchedRepos"> | undefined
   setRepo: (repo: Id<"watchedRepos"> | undefined) => void
   kind: EventKind | undefined

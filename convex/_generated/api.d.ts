@@ -13,6 +13,7 @@ import type * as crons from "../crons.js";
 import type * as gemini from "../gemini.js";
 import type * as github from "../github.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
 import type * as repos from "../repos.js";
 import type * as workflowOptions from "../workflowOptions.js";
 import type * as workflows from "../workflows.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   gemini: typeof gemini;
   github: typeof github;
   http: typeof http;
+  migrations: typeof migrations;
   repos: typeof repos;
   workflowOptions: typeof workflowOptions;
   workflows: typeof workflows;

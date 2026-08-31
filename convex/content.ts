@@ -11,7 +11,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
-import schema, { channel } from "./schema"
+import schema, { channel, draftArtifactFields, draftStatus } from "./schema"
 import { CLEANUP_ON_COMPLETE } from "./workflowOptions"
 
 export const CHANNELS = ["x", "linkedin", "reddit", "blog", "video"] as const
@@ -19,6 +19,112 @@ export type Channel = (typeof CHANNELS)[number]
 
 /** Sibling events kept alongside the subject as context. */
 const MAX_SOURCE_EVENTS = 20
+
+/**
+ * A draft row with its `draftArtifacts` merged back in, which is what every
+ * consumer of a *single* draft wants. The duplicate keys resolve to the same
+ * validators, so this survives dropping the legacy columns.
+ */
+const draftWithArtifacts = v.object({
+  ...schema.doc("contentDrafts").fields,
+  ...draftArtifactFields,
+})
+
+/**
+ * What the drafts list actually renders — and nothing else. The full draft was
+ * ~41KB of which ~40KB was scan text the list never showed, sent to the client
+ * on every status change of every draft.
+ */
+const draftSummary = v.object({
+  _id: v.id("contentDrafts"),
+  _creationTime: v.number(),
+  fullName: v.string(),
+  headline: v.string(),
+  status: draftStatus,
+  hasUserContext: v.boolean(),
+  sourceEventCount: v.number(),
+  version: v.number(),
+  generatedAt: v.optional(v.number()),
+})
+
+type DraftArtifacts = {
+  brief?: string
+  context?: string
+  userContext?: string
+  sourceDigest?: string
+  repoProfile?: string
+  research?: string
+  researchSources?: string[]
+}
+
+/**
+ * The draft's artifacts, falling back to the legacy columns on the draft row
+ * for anything `migrations.backfillDraftArtifacts` has not moved yet. Delete
+ * the fallback together with those columns.
+ */
+async function loadArtifacts(
+  ctx: QueryCtx,
+  draft: Doc<"contentDrafts">
+): Promise<DraftArtifacts> {
+  const row = await ctx.db
+    .query("draftArtifacts")
+    .withIndex("by_draft", (q) => q.eq("draft", draft._id))
+    .unique()
+
+  if (row) {
+    return {
+      brief: row.brief,
+      context: row.context,
+      userContext: row.userContext,
+      sourceDigest: row.sourceDigest,
+      repoProfile: row.repoProfile,
+      research: row.research,
+      researchSources: row.researchSources,
+    }
+  }
+
+  return {
+    brief: draft.brief,
+    context: draft.context,
+    userContext: draft.userContext,
+    sourceDigest: draft.sourceDigest,
+    repoProfile: draft.repoProfile,
+    research: draft.research,
+    researchSources: draft.researchSources,
+  }
+}
+
+/** Upserts a partial artifact patch, carrying the legacy columns over once. */
+async function patchArtifacts(
+  ctx: MutationCtx,
+  draft: Doc<"contentDrafts">,
+  patch: DraftArtifacts
+): Promise<void> {
+  const row = await ctx.db
+    .query("draftArtifacts")
+    .withIndex("by_draft", (q) => q.eq("draft", draft._id))
+    .unique()
+
+  if (row) {
+    await ctx.db.patch("draftArtifacts", row._id, patch)
+    return
+  }
+
+  await ctx.db.insert("draftArtifacts", {
+    draft: draft._id,
+    ownerToken: draft.ownerToken,
+    ...(await loadArtifacts(ctx, draft)),
+    ...patch,
+  })
+}
+
+/** Merges a draft row and its artifacts into the shape the UI and model read. */
+function mergeDraft(
+  draft: Doc<"contentDrafts">,
+  artifacts: DraftArtifacts
+): Doc<"contentDrafts"> & DraftArtifacts {
+  return { ...draft, ...artifacts }
+}
 
 async function requireOwnerToken(ctx: QueryCtx): Promise<string> {
   const identity = await ctx.auth.getUserIdentity()
@@ -41,19 +147,37 @@ async function requireOwnedDraft(
 
 export const listDrafts = query({
   args: {},
-  returns: v.array(schema.doc("contentDrafts")),
+  returns: v.array(draftSummary),
   handler: async (ctx) => {
     const ownerToken = await requireOwnerToken(ctx)
-
-    return await ctx.db
+    const drafts = await ctx.db
       .query("contentDrafts")
       .withIndex("by_owner", (q) => q.eq("ownerToken", ownerToken))
       .order("desc")
       .take(50)
+
+    return drafts.map((draft) => ({
+      _id: draft._id,
+      _creationTime: draft._creationTime,
+      fullName: draft.fullName,
+      headline: draft.headline,
+      status: draft.status,
+      hasUserContext: draft.hasUserContext ?? false,
+      sourceEventCount: draft.sourceEvents.length,
+      version: draft.version,
+      generatedAt: draft.generatedAt,
+    }))
   },
 })
 
-/** The detail view: the draft, its pieces, and the events it was written from. */
+/**
+ * The detail view: the draft, its pieces, and the events it was written from.
+ *
+ * Deliberately does NOT include the scan artifacts. A scan fires ~8 status
+ * patches on the draft row, each of which invalidates this query; merging the
+ * ~40KB artifacts row in meant re-reading it on all eight. The workspace
+ * subscribes to `getDraftArtifacts` separately for that text.
+ */
 export const getDraft = query({
   args: { draftId: v.id("contentDrafts") },
   returns: v.object({
@@ -83,6 +207,46 @@ export const getDraft = query({
   },
 })
 
+/**
+ * The scan's text, on its own subscription. Its read set is the
+ * `draftArtifacts` row alone, so the draft's status changing does not
+ * invalidate it — which is the whole point of the split.
+ *
+ * Authorization comes off `draftArtifacts.ownerToken` for the same reason:
+ * reading the draft row to check ownership would put it back in the read set.
+ * The fallback path for a draft the backfill has not reached yet does read it,
+ * and goes away with the legacy columns.
+ */
+export const getDraftArtifacts = query({
+  args: { draftId: v.id("contentDrafts") },
+  returns: v.union(v.object(draftArtifactFields), v.null()),
+  handler: async (ctx, args) => {
+    const ownerToken = await requireOwnerToken(ctx)
+    const row = await ctx.db
+      .query("draftArtifacts")
+      .withIndex("by_draft", (q) => q.eq("draft", args.draftId))
+      .unique()
+
+    if (row) {
+      if (row.ownerToken !== ownerToken) throw new Error("Draft not found")
+
+      return {
+        brief: row.brief,
+        context: row.context,
+        userContext: row.userContext,
+        sourceDigest: row.sourceDigest,
+        repoProfile: row.repoProfile,
+        research: row.research,
+        researchSources: row.researchSources,
+      }
+    }
+
+    const draft = await requireOwnedDraft(ctx, args.draftId)
+
+    return await loadArtifacts(ctx, draft)
+  },
+})
+
 /** A short label for the thing being written about. */
 function subjectLabel(event: Doc<"repoEvents">): string {
   if (event.kind === "commit") return `Commit: ${event.title}`
@@ -96,11 +260,13 @@ async function siblingEvents(
   ctx: QueryCtx,
   event: Doc<"repoEvents">,
 ): Promise<Doc<"repoEvents">[]> {
+  // One extra row covers the subject itself being in the window; taking 60 to
+  // keep 20 read three times what it used.
   const recent = await ctx.db
     .query("repoEvents")
     .withIndex("by_repo_and_occurredAt", (q) => q.eq("repo", event.repo))
     .order("desc")
-    .take(60)
+    .take(MAX_SOURCE_EVENTS + 1)
 
   return recent
     .filter((sibling) => sibling._id !== event._id)
@@ -126,8 +292,9 @@ export const openEventDraft = mutation({
       .first()
     // A finished or in-flight scan is reused. A failed one, or one from before
     // the scan produced a brief, is scanned again.
-    if (existing && existing.status !== "error" && existing.brief) {
-      return existing._id
+    if (existing && existing.status !== "error") {
+      const { brief } = await loadArtifacts(ctx, existing)
+      if (brief) return existing._id
     }
 
     const siblings = await siblingEvents(ctx, event)
@@ -239,10 +406,14 @@ export const setUserContext = mutation({
   handler: async (ctx, args) => {
     const draft = await requireOwnedDraft(ctx, args.draftId)
     const userContext = args.context.trim() || undefined
+    const { brief } = await loadArtifacts(ctx, draft)
 
-    await ctx.db.patch("contentDrafts", draft._id, {
+    await patchArtifacts(ctx, draft, {
       userContext,
-      context: mergeContext(draft.brief, userContext),
+      context: mergeContext(brief, userContext),
+    })
+    await ctx.db.patch("contentDrafts", draft._id, {
+      hasUserContext: userContext !== undefined,
     })
 
     return null
@@ -258,10 +429,15 @@ export const addContextAndRewrite = mutation({
     const version = draft.version + 1
 
     const userContext = args.context.trim() || undefined
-    await ctx.db.patch("contentDrafts", draft._id, {
+    const { brief } = await loadArtifacts(ctx, draft)
+
+    await patchArtifacts(ctx, draft, {
       userContext,
       // Never drop the scan's brief — the note is added to it, not swapped in.
-      context: mergeContext(draft.brief, userContext),
+      context: mergeContext(brief, userContext),
+    })
+    await ctx.db.patch("contentDrafts", draft._id, {
+      hasUserContext: userContext !== undefined,
       status: "writing",
       version,
       error: undefined,
@@ -314,6 +490,13 @@ export const deleteDraft = mutation({
       .take(20)
 
     for (const piece of pieces) await ctx.db.delete("contentPieces", piece._id)
+
+    const artifacts = await ctx.db
+      .query("draftArtifacts")
+      .withIndex("by_draft", (q) => q.eq("draft", draft._id))
+      .unique()
+    if (artifacts) await ctx.db.delete("draftArtifacts", artifacts._id)
+
     await ctx.db.delete("contentDrafts", draft._id)
 
     return null
@@ -326,8 +509,13 @@ export const deleteDraft = mutation({
 
 export const getDraftInternal = internalQuery({
   args: { draftId: v.id("contentDrafts") },
-  returns: v.union(schema.doc("contentDrafts"), v.null()),
-  handler: async (ctx, args) => await ctx.db.get("contentDrafts", args.draftId),
+  returns: v.union(draftWithArtifacts, v.null()),
+  handler: async (ctx, args) => {
+    const draft = await ctx.db.get("contentDrafts", args.draftId)
+    if (!draft) return null
+
+    return mergeDraft(draft, await loadArtifacts(ctx, draft))
+  },
 })
 
 /** Everything the model needs to describe the change, without the diffs. */
@@ -336,7 +524,7 @@ export const getDraftSources = internalQuery({
   returns: v.union(
     v.object({
       repo: schema.doc("watchedRepos"),
-      draft: schema.doc("contentDrafts"),
+      draft: draftWithArtifacts,
       subject: v.union(schema.doc("repoEvents"), v.null()),
       events: v.array(schema.doc("repoEvents")),
     }),
@@ -349,8 +537,11 @@ export const getDraftSources = internalQuery({
     const repo = await ctx.db.get("watchedRepos", draft.repo)
     if (!repo) return null
 
+    // Bounded like `getDraft`. `sourceEvents` is capped at write time, but an
+    // unbounded read over a stored array is one schema change away from a
+    // full-table read.
     const events: Doc<"repoEvents">[] = []
-    for (const eventId of draft.sourceEvents) {
+    for (const eventId of draft.sourceEvents.slice(0, MAX_SOURCE_EVENTS)) {
       const event = await ctx.db.get("repoEvents", eventId)
       if (event) events.push(event)
     }
@@ -359,7 +550,7 @@ export const getDraftSources = internalQuery({
       ? await ctx.db.get("repoEvents", draft.sourceEvent)
       : null
 
-    return { repo, draft, subject, events }
+    return { repo, draft: mergeDraft(draft, await loadArtifacts(ctx, draft)), subject, events }
   },
 })
 
@@ -433,11 +624,15 @@ export const saveSourceDigest = internalMutation({
     const draft = await ctx.db.get("contentDrafts", args.draftId)
     if (!draft || draft.version !== args.version) return null
 
-    await ctx.db.patch("contentDrafts", draft._id, {
+    await patchArtifacts(ctx, draft, {
       sourceDigest: args.sourceDigest,
-      repoProfile: args.repoProfile ?? draft.repoProfile,
-      headline: args.headline ?? draft.headline,
+      ...(args.repoProfile !== undefined
+        ? { repoProfile: args.repoProfile }
+        : {}),
     })
+    if (args.headline !== undefined && args.headline !== draft.headline) {
+      await ctx.db.patch("contentDrafts", draft._id, { headline: args.headline })
+    }
 
     return null
   },
@@ -456,11 +651,15 @@ export const saveBrief = internalMutation({
     const draft = await ctx.db.get("contentDrafts", args.draftId)
     if (!draft || draft.version !== args.version) return null
 
-    await ctx.db.patch("contentDrafts", draft._id, {
+    const { userContext } = await loadArtifacts(ctx, draft)
+
+    await patchArtifacts(ctx, draft, {
       brief: args.brief,
-      context: mergeContext(args.brief, draft.userContext),
-      headline: args.headline ?? draft.headline,
+      context: mergeContext(args.brief, userContext),
     })
+    if (args.headline !== undefined && args.headline !== draft.headline) {
+      await ctx.db.patch("contentDrafts", draft._id, { headline: args.headline })
+    }
 
     return null
   },
@@ -479,11 +678,13 @@ export const saveResearch = internalMutation({
     const draft = await ctx.db.get("contentDrafts", args.draftId)
     if (!draft || draft.version !== args.version) return null
 
-    await ctx.db.patch("contentDrafts", draft._id, {
+    await patchArtifacts(ctx, draft, {
       research: args.research,
       researchSources: args.sources,
-      model: args.model,
     })
+    if (draft.model !== args.model) {
+      await ctx.db.patch("contentDrafts", draft._id, { model: args.model })
+    }
 
     return null
   },

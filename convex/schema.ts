@@ -28,6 +28,34 @@ export const draftStatus = v.union(
   v.literal("error")
 )
 
+/**
+ * The scan's big text artifacts. They live in their own table because the
+ * draft row is read by the drafts list and rewritten on every status change,
+ * and these seven fields are ~40KB of the ~41KB draft — reading and rewriting
+ * them on each of those was the bulk of the deployment's database bandwidth.
+ *
+ * Declared once so `draftArtifacts` and the legacy columns on `contentDrafts`
+ * cannot drift while the backfill is in flight.
+ */
+export const draftArtifactFields = {
+  /** The scan's grounded understanding of the change, on its own. */
+  brief: v.optional(v.string()),
+  /**
+   * The working context every writing pass reads: the model's own brief on
+   * the change, merged with whatever the author added.
+   */
+  context: v.optional(v.string()),
+  /** Raw free-text the author added, kept separately so merges stay idempotent. */
+  userContext: v.optional(v.string()),
+  /** Commits, PRs and diff excerpts the model was given. */
+  sourceDigest: v.optional(v.string()),
+  /** Snapshot of the repo profile this draft was scanned against. */
+  repoProfile: v.optional(v.string()),
+  /** What the grounded research pass found about format and virality. */
+  research: v.optional(v.string()),
+  researchSources: v.optional(v.array(v.string())),
+}
+
 export default defineSchema({
   /**
    * One row per repo a user asked dalog to watch. `ownerToken` is the Clerk
@@ -58,17 +86,21 @@ export default defineSchema({
     /** Denormalized — Convex has no count operator. */
     eventCount: v.number(),
     /**
-     * A rendered profile of the codebase itself — description, languages,
-     * dependencies, directory layout and README excerpt. Cached here because
-     * it changes far more slowly than the events do, and every scan needs it
-     * to read a diff in the context of the project it landed in.
+     * LEGACY — the codebase profile now lives in `repoProfiles`. Kept optional
+     * only so the backfill can read it; drop both fields once
+     * `migrations.backfillRepoProfiles` reports 0 remaining.
      */
     repoProfile: v.optional(v.string()),
     profiledAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerToken"])
     .index("by_owner_and_fullName", ["ownerToken", "fullName"])
-    .index("by_githubRepoId", ["githubRepoId"]),
+    .index("by_githubRepoId", ["githubRepoId"])
+    // The stalled-watch cron, which otherwise scans every repo of every user
+    // every 15 minutes to usually act on nothing. `lastSyncedAt` is optional
+    // and undefined sorts before every number, so a watching repo that has
+    // never synced is correctly inside the "stalled" range.
+    .index("by_status_and_lastSyncedAt", ["status", "lastSyncedAt"]),
 
   /**
    * Commits, pull requests, merges and branch changes, from either the webhook
@@ -112,22 +144,16 @@ export default defineSchema({
     /** The one commit, PR, merge or branch this draft is about. */
     sourceEvent: v.optional(v.id("repoEvents")),
     /**
-     * The working context every writing pass reads: the model's own brief on
-     * the change, merged with whatever the author added. Written by the scan,
-     * so it is never empty once a draft is scanned.
+     * Whether the author attached their own context. The drafts list only ever
+     * needed the boolean, not the text, so the text stayed in `draftArtifacts`.
      */
-    context: v.optional(v.string()),
-    /** The scan's grounded understanding of the change, on its own. */
-    brief: v.optional(v.string()),
-    /** Raw free-text the author added, kept separately so merges stay idempotent. */
-    userContext: v.optional(v.string()),
-    /** Commits, PRs and diff excerpts the model was given. */
-    sourceDigest: v.optional(v.string()),
-    /** Snapshot of the repo profile this draft was scanned against. */
-    repoProfile: v.optional(v.string()),
-    /** What the grounded research pass found about format and virality. */
-    research: v.optional(v.string()),
-    researchSources: v.optional(v.array(v.string())),
+    hasUserContext: v.optional(v.boolean()),
+    /**
+     * LEGACY — these now live in `draftArtifacts`. Kept optional only so the
+     * backfill can read them; drop this spread once
+     * `migrations.backfillDraftArtifacts` reports 0 remaining.
+     */
+    ...draftArtifactFields,
     /** Sibling events given as surrounding context. */
     sourceEvents: v.array(v.id("repoEvents")),
     model: v.string(),
@@ -153,4 +179,39 @@ export default defineSchema({
   })
     .index("by_draft", ["draft"])
     .index("by_draft_and_channel", ["draft", "channel"]),
+
+  /**
+   * The rendered profile of a codebase — description, languages, dependencies,
+   * directory layout, README excerpt. Split out of `watchedRepos` because that
+   * row is patched on every poll and read by `listWatched`, and a full-document
+   * read plus rewrite of a 14KB profile every 60 seconds is pure waste.
+   */
+  repoProfiles: defineTable({
+    repo: v.id("watchedRepos"),
+    profile: v.string(),
+    profiledAt: v.number(),
+  }).index("by_repo", ["repo"]),
+
+  /**
+   * Per-repo poll bookkeeping, kept off `watchedRepos` so the poller can write
+   * it every cycle for a few hundred bytes.
+   *
+   * `eventsFingerprint` is a SHA-256 over the sorted `externalId`s the last
+   * poll derived. Dedupe is purely by `externalId`, so an identical
+   * fingerprint means there is provably nothing new to insert — and the poll
+   * can skip the ~160 per-event document reads it would otherwise do.
+   */
+  repoSyncState: defineTable({
+    repo: v.id("watchedRepos"),
+    eventsFingerprint: v.optional(v.string()),
+    /** Exact last poll time; `watchedRepos.lastSyncedAt` is throttled for the UI. */
+    polledAt: v.number(),
+  }).index("by_repo", ["repo"]),
+
+  /** The scan's heavy text, one row per draft. See `draftArtifactFields`. */
+  draftArtifacts: defineTable({
+    draft: v.id("contentDrafts"),
+    ownerToken: v.string(),
+    ...draftArtifactFields,
+  }).index("by_draft", ["draft"]),
 })

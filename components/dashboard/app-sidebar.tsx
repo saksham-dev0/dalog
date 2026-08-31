@@ -50,7 +50,7 @@ const accountNav: NavItem[] = [
 /** Connection comes from the layout; the watch count is a live Convex query. */
 function AppSidebar({ githubConnected }: { githubConnected: boolean }) {
   const pathname = usePathname()
-  const watchedCount = useQuery(api.repos.listWatched)?.length ?? 0
+  const watchedCount = useQuery(api.repos.countWatched) ?? 0
 
   // /dashboard only matches exactly; everything else matches its subtree.
   const isActive = (href: string) =>

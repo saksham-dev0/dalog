@@ -9,9 +9,6 @@ import { components, internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
 import { CHANNELS } from "./content"
 
-/** Gap between polls. Webhooks cover the instant path; this is the safety net. */
-const POLL_INTERVAL_MS = 60_000
-
 export const workflow = new WorkflowManager(components.workflow, {
   workpoolOptions: {
     maxParallelism: 10,
@@ -101,7 +98,7 @@ export const killWorkflow = internalMutation({
  * Durable watch loop for one repo: poll, sleep, repeat. It runs a bounded
  * number of cycles and then starts a successor, so a single workflow's journal
  * stays small while the repo keeps being watched indefinitely. Unwatching
- * cancels the workflow, and the `isWatching` check stops the loop either way.
+ * cancels the workflow, and the `pollPlan` check stops the loop either way.
  */
 export const syncRepoWorkflow = workflow
   .define({
@@ -110,16 +107,19 @@ export const syncRepoWorkflow = workflow
   })
   .handler(async (step, args): Promise<null> => {
     for (let cycle = 0; cycle < args.cycles; cycle++) {
-      const stillWatching: boolean = await step.runQuery(
-        internal.repos.isWatching,
-        { repoId: args.repoId }
-      )
-      if (!stillWatching) return null
+      // One read answers both "should I keep going" and "how long do I sleep":
+      // a repo whose webhook works polls as a safety net, not as the transport.
+      const plan: {
+        watching: boolean
+        pollIntervalMs: number
+        since?: number
+      } = await step.runQuery(internal.repos.pollPlan, { repoId: args.repoId })
+      if (!plan.watching) return null
 
       try {
         await step.runAction(
           internal.github.syncRepo,
-          { repoId: args.repoId },
+          { repoId: args.repoId, since: plan.since },
           { retry: true }
         )
       } catch (error) {
@@ -132,7 +132,7 @@ export const syncRepoWorkflow = workflow
         return null
       }
 
-      await step.sleep(POLL_INTERVAL_MS)
+      await step.sleep(plan.pollIntervalMs)
     }
 
     await step.runMutation(internal.repos.continueWatching, {

@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { useMutation, useQuery } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 import { toast } from "sonner"
 
 import { BrightBadge } from "@/components/bright/badge"
@@ -17,7 +18,9 @@ import { BrightButton } from "@/components/bright/button"
 import { Surface } from "@/components/bright/card"
 import { GithubMark } from "@/components/dashboard/github-mark"
 import { api } from "@/convex/_generated/api"
-import type { Doc } from "@/convex/_generated/dataModel"
+
+/** The projection `listWatched` returns, not the stored document. */
+type WatchedRepo = FunctionReturnType<typeof api.repos.listWatched>[number]
 
 export type GithubRepoSummary = {
   id: number
@@ -43,7 +46,7 @@ function formatWhen(timestamp: number | undefined) {
 }
 
 /** Live watch state for one repo: what the workflow is doing right now. */
-function WatchStatus({ repo }: { repo: Doc<"watchedRepos"> }) {
+function WatchStatus({ repo }: { repo: WatchedRepo }) {
   if (repo.status === "error") {
     return (
       <BrightBadge tone="attention" className="gap-[6px] px-[10px] py-1">

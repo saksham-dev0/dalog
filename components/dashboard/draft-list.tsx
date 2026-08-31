@@ -94,9 +94,9 @@ function DraftList() {
                 {draft.headline}
               </span>
               <span className="text-[13px] text-ink-300">
-                {draft.sourceEvents.length} events
+                {draft.sourceEventCount} events
                 {draft.version > 1 ? ` · revision ${draft.version}` : ""}
-                {draft.context ? " · has your context" : ""}
+                {draft.hasUserContext ? " · has your context" : ""}
               </span>
             </div>
 

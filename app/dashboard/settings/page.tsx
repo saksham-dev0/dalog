@@ -18,12 +18,12 @@ export const metadata = {
 
 export default async function SettingsPage() {
   const connection = await getGithubConnection()
-  const watched = connection
+  const watchedCount = connection
     ? await convexServerQuery(
-        (client) => client.query(api.repos.listWatched, {}),
-        []
+        (client) => client.query(api.repos.countWatched, {}),
+        0
       )
-    : []
+    : 0
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-7">
@@ -90,7 +90,7 @@ export default async function SettingsPage() {
             </span>
             <span className="truncate text-[13px] text-ink-300">
               {connection
-                ? `${watched.length} ${watched.length === 1 ? "repo" : "repos"} watched · scopes: ${
+                ? `${watchedCount} ${watchedCount === 1 ? "repo" : "repos"} watched · scopes: ${
                     connection.scopes.length
                       ? connection.scopes.join(", ")
                       : "default"

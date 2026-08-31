@@ -102,13 +102,36 @@ type PullJson = {
 type BranchJson = { name: string; commit: { sha: string } }
 
 /**
+ * A stable digest of the set of events a poll derived. Dedupe in
+ * `recordEvents` looks at nothing but `externalId`, so if this digest matches
+ * the previous poll's, that poll can skip its per-event document reads
+ * entirely. Sorted so GitHub's ordering cannot make an unchanged repo look
+ * changed.
+ */
+async function fingerprintEvents(events: EventInput[]): Promise<string> {
+  const joined = events
+    .map((event) => event.externalId)
+    .sort()
+    .join("\n")
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(joined)
+  )
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+/**
  * One pass over a repo: recent commits on the default branch, recently touched
  * pull requests, and the branch list. `recordEvents` drops anything already
  * stored, so overlapping passes are free.
  */
 async function syncRepoOnce(
   ctx: ActionCtx,
-  repoId: Id<"watchedRepos">
+  repoId: Id<"watchedRepos">,
+  polledAt?: number
 ): Promise<number> {
   const repo = await ctx.runQuery(internal.repos.getRepo, { repoId })
   if (!repo) return 0
@@ -116,8 +139,11 @@ async function syncRepoOnce(
   const token = await getGithubToken(repo.clerkUserId)
   const name = repo.fullName
   // A little overlap on re-sync beats missing commits pushed mid-sync.
-  const since = repo.lastSyncedAt
-    ? `&since=${new Date(repo.lastSyncedAt - 60_000).toISOString()}`
+  // `polledAt` is the exact last poll; `lastSyncedAt` is throttled for the UI
+  // and can lag it by minutes, which would only widen this window.
+  const lastPoll = polledAt ?? repo.lastSyncedAt
+  const since = lastPoll
+    ? `&since=${new Date(lastPoll - 60_000).toISOString()}`
     : ""
 
   const [commits, pulls, branches] = await Promise.all([
@@ -212,6 +238,7 @@ async function syncRepoOnce(
     source: "poll",
     events,
     syncedAt: Date.now(),
+    fingerprint: await fingerprintEvents(events),
   })
 }
 
@@ -316,9 +343,10 @@ export const getTokenForRepo = internalAction({
 
 /** One polling cycle. The workflow calls this on a loop. */
 export const syncRepo = internalAction({
-  args: { repoId: v.id("watchedRepos") },
+  args: { repoId: v.id("watchedRepos"), since: v.optional(v.number()) },
   returns: v.number(),
-  handler: async (ctx, args) => await syncRepoOnce(ctx, args.repoId),
+  handler: async (ctx, args) =>
+    await syncRepoOnce(ctx, args.repoId, args.since),
 })
 
 /* -------------------------------------------------------------------------- */
@@ -459,11 +487,11 @@ export const buildRepoProfile = internalAction({
     )
     if (!repo) throw new Error("Repo not found")
 
-    const fresh =
-      repo.repoProfile &&
-      repo.profiledAt &&
-      Date.now() - repo.profiledAt < PROFILE_TTL_MS
-    if (fresh && !args.force) return repo.repoProfile as string
+    const cached: { profile: string; profiledAt: number } | null =
+      await ctx.runQuery(internal.repos.getProfile, { repoId: args.repoId })
+    if (cached && !args.force && Date.now() - cached.profiledAt < PROFILE_TTL_MS) {
+      return cached.profile
+    }
 
     const token = await getGithubToken(repo.clerkUserId)
     const name = repo.fullName

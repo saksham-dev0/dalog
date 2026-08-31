@@ -111,6 +111,9 @@ function ReadMore({
  */
 function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
   const data = useQuery(api.content.getDraft, { draftId })
+  // Separate subscription on purpose: the scan text does not change when the
+  // draft's status does, so it must not ride on a query the status invalidates.
+  const artifacts = useQuery(api.content.getDraftArtifacts, { draftId })
   const updatePiece = useMutation(api.content.updatePiece)
   const rewrite = useMutation(api.content.addContextAndRewrite)
   const generate = useMutation(api.content.generatePieces)
@@ -276,8 +279,8 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
               What the model read
             </span>
             <span className="ml-auto hidden shrink-0 text-[13px] text-ink-300 sm:block">
-              {draft.sourceDigest
-                ? `${Math.round(draft.sourceDigest.length / 1000)}k chars of diff`
+              {artifacts?.sourceDigest
+                ? `${Math.round(artifacts?.sourceDigest.length / 1000)}k chars of diff`
                 : "no diff yet"}
             </span>
           </CollapsibleTrigger>
@@ -297,33 +300,33 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
                 </ul>
               </div>
 
-              {draft.brief ? (
+              {artifacts?.brief ? (
                 <div className="flex flex-col gap-2">
                   <SpecLabel>The model&apos;s brief</SpecLabel>
                   <p className="text-[13px] leading-[1.6] whitespace-pre-wrap text-ink-500">
-                    {draft.brief}
+                    {artifacts?.brief}
                   </p>
                 </div>
               ) : null}
 
-              {draft.sourceDigest ? (
+              {artifacts?.sourceDigest ? (
                 <div className="flex flex-col gap-2">
                   <SpecLabel>Diff digest</SpecLabel>
                   <pre className="max-h-[320px] overflow-auto rounded-[12px] bg-sunken p-4 font-mono text-[12px] leading-[1.6] text-ink-700">
-                    {draft.sourceDigest}
+                    {artifacts?.sourceDigest}
                   </pre>
                 </div>
               ) : null}
 
-              {draft.research ? (
+              {artifacts?.research ? (
                 <div className="flex flex-col gap-2">
                   <SpecLabel>Format research</SpecLabel>
                   <p className="text-[13px] leading-[1.6] whitespace-pre-wrap text-ink-500">
-                    {draft.research}
+                    {artifacts?.research}
                   </p>
-                  {draft.researchSources?.length ? (
+                  {artifacts?.researchSources?.length ? (
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {draft.researchSources.slice(0, 8).map((url) => (
+                      {artifacts?.researchSources.slice(0, 8).map((url) => (
                         <a
                           key={url}
                           href={url}
@@ -400,8 +403,8 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
                 <p className="text-[15px] leading-[1.6] text-ink-500">
                   The AI has read this{" "}
                   {subject?.kind.replace("_", " ") ?? "change"}
-                  {draft.sourceDigest
-                    ? ` (${Math.round(draft.sourceDigest.length / 1000)}k chars of diff)`
+                  {artifacts?.sourceDigest
+                    ? ` (${Math.round(artifacts?.sourceDigest.length / 1000)}k chars of diff)`
                     : ""}{" "}
                   and researched the current formats. Generate when you are
                   ready.
@@ -533,13 +536,13 @@ function DraftWorkspace({ draftId }: { draftId: Id<"contentDrafts"> }) {
               when you add to it.
             </ReadMore>
           </div>
-          {draft.userContext ? (
+          {artifacts?.userContext ? (
             <div className="rounded-[12px] bg-sunken p-3">
               <ReadMore
                 className="text-[13px] leading-[1.6] text-ink-500"
                 moreLabel="Read full context"
               >
-                {draft.userContext}
+                {artifacts?.userContext}
               </ReadMore>
             </div>
           ) : null}
