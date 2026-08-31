@@ -9,8 +9,10 @@ const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
 /** Overridable per deployment; Flash is fast enough for a five-piece run. */
 const DEFAULT_MODEL = "gemini-3.7-flash"
 /** Diff text is the expensive part of the prompt — keep it bounded. */
-const MAX_DIGEST_CHARS = 24_000
-const MAX_PATCH_CHARS_PER_FILE = 2_000
+const MAX_DIGEST_CHARS = 40_000
+const MAX_PATCH_CHARS_PER_FILE = 3_000
+/** The codebase profile is stored apart from the diff so neither crowds the other. */
+const MAX_PROFILE_CHARS = 14_000
 
 type GeminiPart = { text?: string }
 type GeminiResponse = {
@@ -102,7 +104,7 @@ async function githubJson<T>(token: string, path: string): Promise<T | null> {
 
 function renderFiles(files: FileChange[]): string {
   return files
-    .slice(0, 12)
+    .slice(0, 25)
     .map((file) => {
       const header = `${file.status} ${file.filename} (+${file.additions}/-${file.deletions})`
       const patch = file.patch?.slice(0, MAX_PATCH_CHARS_PER_FILE) ?? ""
@@ -110,6 +112,45 @@ function renderFiles(files: FileChange[]): string {
       return patch ? `${header}\n${patch}` : header
     })
     .join("\n\n")
+}
+
+/** Keeps the commit body, not just the subject line — that is where intent lives. */
+function renderCommitMessage(message: string): string {
+  const [subject, ...rest] = message.split("\n")
+  const body = rest.join("\n").trim()
+
+  return body ? `- ${subject}\n  ${body.replace(/\n/g, "\n  ")}` : `- ${subject}`
+}
+
+/**
+ * Branch and commit names are the cheapest statement of intent in the whole
+ * repo: `fix/webhook-retry`, `FEAT: context added on every scan`. They are
+ * pulled out and labelled so the model reads them as the author's own summary
+ * rather than as noise at the top of a diff.
+ */
+function namingSignals(
+  subject: Doc<"repoEvents"> | null,
+  repo: Doc<"watchedRepos">
+): string {
+  if (!subject) return ""
+
+  const lines = [
+    `Event type: ${subject.kind} / ${subject.action}`,
+    `Title as the author wrote it: "${subject.title}"`,
+    subject.branch ? `Branch name: ${subject.branch}` : "",
+    subject.branch && subject.branch !== repo.defaultBranch
+      ? `Branch name segments (often the intent in shorthand): ${subject.branch
+          .split(/[\/_\-.]+/)
+          .filter(Boolean)
+          .join(" | ")}`
+      : "",
+    subject.number ? `Number: #${subject.number}` : "",
+    `Author: ${subject.actor}`,
+  ]
+
+  return `NAMING SIGNALS (the author's own shorthand for this change — treat as stated intent, not speculation):\n${lines
+    .filter(Boolean)
+    .join("\n")}`
 }
 
 /**
@@ -135,18 +176,17 @@ export const buildSourceDigest = internalAction({
     const token = await ctx.runAction(internal.github.getTokenForRepo, {
       repoId: repo._id,
     })
+    // The whole-codebase read. Cached on the repo, so this is one call per
+    // scan and usually a cache hit.
+    const repoProfile: string = await ctx.runAction(
+      internal.github.buildRepoProfile,
+      { repoId: repo._id }
+    )
     const name = repo.fullName
     const sections: string[] = [
       `Repository: ${name} (default branch ${repo.defaultBranch})`,
+      namingSignals(subject, repo),
     ]
-
-    if (subject) {
-      sections.push(
-        `Subject: ${subject.kind} / ${subject.action} — "${subject.title}" by ${subject.actor}${
-          subject.branch ? ` on ${subject.branch}` : ""
-        }`
-      )
-    }
 
     // Each kind needs a different read to see what actually changed.
     if (subject?.kind === "commit" && subject.sha) {
@@ -193,8 +233,8 @@ export const buildSourceDigest = internalAction({
           ? `Merged ${pull.head?.ref ?? "?"} into ${pull.base.ref} (+${pull.additions ?? 0}/-${pull.deletions ?? 0} across ${pull.changed_files ?? 0} files)`
           : "",
         commits
-          ? `Commits in this PR:\n${commits
-              .map((c) => `- ${c.commit.message.split("\n")[0]}`)
+          ? `Commits in this PR (full messages — the author often explains the change here):\n${commits
+              .map((c) => renderCommitMessage(c.commit.message))
               .join("\n")}`
           : "",
         files ? `Changed files:\n${renderFiles(files)}` : ""
@@ -215,9 +255,9 @@ export const buildSourceDigest = internalAction({
         sections.push(
           `Branch ${subject.branch} is ${compare.ahead_by ?? 0} commits ahead of ${repo.defaultBranch}`,
           compare.commits
-            ? `Commits on the branch:\n${compare.commits
-                .slice(0, 20)
-                .map((c) => `- ${c.commit.message.split("\n")[0]}`)
+            ? `Commits on the branch (full messages):\n${compare.commits
+                .slice(0, 30)
+                .map((c) => renderCommitMessage(c.commit.message))
                 .join("\n")}`
             : "",
           compare.files ? `Changed files:\n${renderFiles(compare.files)}` : ""
@@ -248,6 +288,7 @@ export const buildSourceDigest = internalAction({
       draftId: args.draftId,
       version: args.version,
       sourceDigest: digest,
+      repoProfile: repoProfile.slice(0, MAX_PROFILE_CHARS),
     })
 
     return null
@@ -274,23 +315,31 @@ export const buildChangeBrief = internalAction({
     if (!draft || draft.version !== args.version) return null
 
     const { text } = await callGemini(
-      `Read this change and write a factual brief for a writer who will turn it into posts.
+      `Read this codebase and this change, then write the brief a build-in-public writer will turn into posts. You are mining for BOTH facts and story.
 
-CHANGE (the only source of truth):
+THE CODEBASE (what this project is, its stack, its layout, its README — use it to understand what the change means for the project as a whole):
+${draft.repoProfile ?? "(no codebase profile available)"}
+
+THE CHANGE (the only source of truth for what happened):
 ${draft.sourceDigest ?? "(no diff available)"}
 
 Write these sections, plainly, no preamble:
 WHAT CHANGED — the concrete change, in 2-4 sentences, naming the real modules/files/functions.
 HOW IT WORKS — the mechanism, specific enough that a developer could argue with it.
-WHY (STATED) — only motivation actually stated in the commit message, PR description or code comments. If none is stated, write "not stated in the change".
+WHY (STATED) — motivation actually stated by the author, in this priority order: the PR description, the commit message bodies, the branch name, the commit/PR title, code comments. Branch and commit names are the author's own summary — read them as intent ("fix/webhook-retry" means retries were broken), not as decoration. Quote the phrasing you took it from. Only if none of these say anything, write "not stated in the change".
+WHERE IT FITS — where these files sit in the project per the codebase profile, what they connect to, and what the project does overall. One reader-friendly sentence a stranger could follow.
 USER-FACING IMPACT — what someone using this would notice. If the diff does not show one, say so.
 NUMBERS — any real figures present (file counts, line counts, timings, limits). Never estimate or invent one.
-UNKNOWNS — what a reader would want to know that this change does not answer. Be honest here; the writer must not guess at these.
+THE TENSION — what was broken, slow, ugly, or annoying BEFORE this change, as evidenced by the code being replaced. This is the story engine; be concrete about the old way.
+SURPRISE — the least obvious thing here: a non-obvious tradeoff, a counterintuitive approach, a constraint that forced the design, a thing most devs get wrong. If nothing is surprising, say "nothing surprising".
+OPINION MATERIAL — the arguable positions this change implies (a pattern chosen over a popular one, a library not used, a shortcut taken deliberately). Devs argue with opinions; list the real ones this code takes.
+RELATABLE MOMENT — the part another builder would recognize from their own work (the yak-shave, the rewrite, the thing that took 4x longer than expected), grounded in what the diff shows.
+UNKNOWNS — what a reader would want to know that this change does not answer. The writer must not guess at these.
 
-Rules: every claim must be traceable to the change above. Do not speculate about performance, adoption, or motivation. Do not use marketing language.`,
+Rules: every claim must be traceable to the codebase profile or the change above. TENSION, SURPRISE, OPINION MATERIAL and RELATABLE MOMENT must be read out of the actual code, not imagined — if the diff does not support one, write "not visible in this change" rather than inventing it. Do not speculate about performance or adoption. Do not use marketing language.`,
       {
         system:
-          "You extract facts from diffs. You never infer intent that is not written down, and you never invent numbers.",
+          "You extract facts AND story angles from diffs. You never infer intent that is not written down, and you never invent numbers — but you are sharp at spotting what is genuinely interesting in a change.",
       }
     )
 
@@ -319,16 +368,26 @@ export const researchFormats = internalAction({
     if (!draft) return null
 
     const { text, sources } = await callGemini(
-      `Research how developer/technical content is performing RIGHT NOW on X, LinkedIn, Reddit, engineering blogs, and short-form video.
+      `Research what is getting reach RIGHT NOW in build-in-public / indie-hacker / developer content on X, LinkedIn, Reddit, engineering blogs, and short-form video.
 
-Topic of the upcoming posts: "${draft.headline}" — one specific change in ${draft.fullName}.
+Topic of the upcoming posts: "${draft.headline}" — one specific change in ${draft.fullName}, written by the builder who shipped it.
 
-Search the web and report, per platform:
-- the post structure that is currently getting reach (hook, body shape, length, line breaks, formatting)
-- what openings get ignored
+What the project is (so the research fits the actual audience, not developers in general):
+${(draft.repoProfile ?? "").slice(0, 2_000) || "(unknown project)"}
+
+Search the web and report:
+
+1. TRENDING RIGHT NOW — what build-in-public and dev-tool content is actually spreading this month: recurring themes, arguments devs are having, formats being copied, angles that feel fresh vs. exhausted. Name specifics, not categories.
+
+2. PER PLATFORM (X, LinkedIn, Reddit, blog, short video):
+- the post structure currently getting reach (hook, body shape, length, line breaks, formatting)
+- hook patterns that are working for solo builders shipping features, with real example openings
+- openings that get scrolled past or read as AI-written
 - norms that get a post removed or downvoted (especially Reddit self-promotion rules)
 - whether hashtags/emoji/links help or hurt right now
 - one concrete example structure to imitate
+
+3. VIRALITY MECHANICS — for this kind of content specifically: what makes devs quote-post, comment, or argue. Which of these are landing now: a strong opinion, a before/after, a real number, a failure admitted, a contrarian take, a "nobody talks about this", one vivid concrete detail. Rank them by what is currently working.
 
 Be specific and current. No preamble.`,
       { search: true }
@@ -351,30 +410,37 @@ Be specific and current. No preamble.`,
 /* -------------------------------------------------------------------------- */
 
 const CHANNEL_BRIEF: Record<Channel, string> = {
-  x: `A single X (Twitter) post, under 280 characters. No hashtags unless one is genuinely load-bearing. Concrete specifics beat adjectives. Line breaks are allowed.`,
-  linkedin: `A LinkedIn post, 120-220 words. Strong first line that reads well truncated. Short paragraphs, a concrete lesson or number, no corporate filler, no "excited to announce" opener.`,
-  reddit: `A Reddit self-post for a relevant developer subreddit: a title line, then the body in Reddit-flavored markdown. Written as a builder sharing work and inviting critique, never as marketing. Disclose that it is your own project.`,
-  blog: `A blog post in markdown, 400-700 words: an H1, a short lede, 2-3 H2 sections, and a closing. Technical, specific to the actual diff, and honest about tradeoffs.`,
-  video: `A 45-70 second short-form video script with timestamps, spoken lines, and on-screen cues. Hook in the first 3 seconds. Written to be read aloud.`,
+  x: `A single X post, under 280 characters. Line 1 is the whole bet — a claim, a number, a before/after, or an admission, never a summary of what follows. No "excited to share", no thread bait, no hashtags unless one is load-bearing. One concrete detail from the code does more work than any adjective. End on something a dev can disagree with or ask about.`,
+  linkedin: `A LinkedIn post, 120-220 words. First line must land alone — it is all most people see. Then short paragraphs, one idea each, plenty of white space. Structure: the problem you hit → what you tried → what you shipped → what you learned or still doubt. One real number or one real file/function name. No corporate voice, no "thrilled to announce", no emoji bullets. Close with a genuine question, not a CTA.`,
+  reddit: `A Reddit self-post for a relevant developer subreddit: a title line, then the body in Reddit-flavored markdown. Reddit punishes polish — write like a person posting at 1am. Lead with the technical problem, not the product. Show the approach honestly, including what is still bad about it. Disclose it is your own project in one plain sentence. Invite critique on a specific decision, and mean it. No links stuffed in, no marketing cadence.`,
+  blog: `A blog post in markdown, 400-700 words: an H1 that promises one specific thing, a lede that opens on the problem (not on "in this post"), 2-3 H2 sections, and a closing. Narrative: what broke, what you tried, what the code does now, the tradeoff you accepted. Real module and function names. Honest about what is unfinished.`,
+  video: `A 45-70 second short-form video script with timestamps, spoken lines, and on-screen cues. First 3 seconds must be a concrete claim or a problem stated out loud — never a greeting or "in this video". Spoken like a builder talking to another builder, contractions and all. One visual beat per line. End on the open question, not a subscribe ask.`,
 }
 
+/**
+ * The writing pass. The brief is the truth; the research is the format; this
+ * prompt supplies the voice — a builder shipping in public, not a changelog.
+ */
 function writePrompt(
   draft: Doc<"contentDrafts">,
   channelId: Channel,
   previous: string | undefined
 ): string {
   return [
-    `You are writing for the developer who made this change. First person, their voice, no hype.`,
+    `You are the builder who shipped this change, writing in public about it. First person, present tense, talking to other builders — not announcing to customers.`,
     ``,
     `SUBJECT: ${draft.headline}. Write about this one change only — the surrounding activity is context, not the topic.`,
+    ``,
+    `THE PROJECT (what you are building — its stack, layout and README; use it so the post reads like someone who knows this codebase, and so a stranger understands what the change is part of):`,
+    draft.repoProfile ?? "(no codebase profile available)",
     ``,
     `CONTEXT (the brief the scan produced, plus anything the author told us — this is the source of truth):`,
     draft.context ?? draft.brief ?? "(no brief available)",
     ``,
-    `RAW CHANGE (cite specifics from here; never state anything it does not support):`,
+    `RAW CHANGE (branch name, commit messages and the diff — cite specifics from here; never state anything it does not support):`,
     draft.sourceDigest ?? "(no diff available; rely on the activity list only)",
     ``,
-    `PLATFORM RESEARCH (current formats that perform):`,
+    `PLATFORM RESEARCH (what is trending and what formats are getting reach right now — follow it):`,
     draft.research ?? "(no research available)",
     ``,
     draft.userContext
@@ -383,10 +449,19 @@ function writePrompt(
     previous
       ? `PREVIOUS VERSION (revise it against the author context; keep what still works):\n${previous}\n`
       : ``,
+    `HOW TO WRITE IT:`,
+    `- Pick ONE angle from the brief and commit to it: the tension (what was broken before), the surprise, the opinion, or the relatable moment. Do not write a summary that touches all of them.`,
+    `- Earn the first line. It carries the whole post: a claim, a number, a before/after, a mistake admitted, or a stated opinion. Never a label, never "I just shipped X", never a question you immediately answer.`,
+    `- Use the virality mechanics the research ranked highest, but only ones this change actually supports.`,
+    `- Show the mechanism. One real file, function, or constraint from the diff beats three sentences of description — specificity is what makes builders trust and share it.`,
+    `- Build in public means the messy parts count: what you tried first, what you cut, what you still are not sure about. Include at least one honest limitation.`,
+    `- Take a position where the brief gives you one. A post nobody can disagree with gets no replies.`,
+    `- Sound like a person: contractions, varied sentence length, occasional fragment. No em-dash-heavy cadence, no tricolon lists, no "it's not just X, it's Y", no "game-changer", "seamless", "leverage", "unlock", "dive into", "in today's world".`,
+    ``,
     `TASK: write the ${channelId} piece.`,
     CHANNEL_BRIEF[channelId],
     ``,
-    `Rules: every factual claim must trace to the context or the raw change above — if the brief lists it under UNKNOWNS, do not assert it. No invented numbers, no invented motivation, no placeholder text, no meta commentary. Output the post text only.`,
+    `HARD RULES: every factual claim must trace to the context or the raw change above — if the brief lists it under UNKNOWNS or "not visible in this change", do not assert it. No invented numbers, no invented users, no fake metrics, no invented backstory. Hype is banned; a strong, honest opinion is not. Output the post text only — no preamble, no title unless the format calls for one, no meta commentary.`,
   ]
     .filter(Boolean)
     .join("\n")
@@ -417,7 +492,7 @@ export const writeChannel = internalAction({
       writePrompt(draft, args.channel, args.previous),
       {
         system:
-          "You are a senior developer who writes unusually well. You never exaggerate, and you never write anything the diff does not support.",
+          "You are a senior developer with a real audience who builds in public. You write the way the best indie builders post: specific, opinionated, honest about what broke, allergic to marketing voice and to anything that reads as AI-written. You never exaggerate, never invent a number or a user, and never write anything the diff does not support — but within the truth you always pick the sharpest, most shareable angle.",
       }
     )
 

@@ -14,6 +14,7 @@ import type * as gemini from "../gemini.js";
 import type * as github from "../github.js";
 import type * as http from "../http.js";
 import type * as repos from "../repos.js";
+import type * as workflowOptions from "../workflowOptions.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   github: typeof github;
   http: typeof http;
   repos: typeof repos;
+  workflowOptions: typeof workflowOptions;
   workflows: typeof workflows;
 }>;
 

@@ -1,7 +1,12 @@
 import { v } from "convex/values"
-import { WorkflowManager } from "@convex-dev/workflow"
+import {
+  WorkflowManager,
+  vResultValidator,
+  vWorkflowId,
+} from "@convex-dev/workflow"
 
 import { components, internal } from "./_generated/api"
+import { internalMutation } from "./_generated/server"
 import { CHANNELS } from "./content"
 
 /** Gap between polls. Webhooks cover the instant path; this is the safety net. */
@@ -12,6 +17,83 @@ export const workflow = new WorkflowManager(components.workflow, {
     maxParallelism: 10,
     defaultRetryBehavior: { maxAttempts: 3, initialBackoffMs: 2_000, base: 2 },
     retryActionsByDefault: true,
+  },
+})
+
+/**
+ * Every workflow is started with this as its `onComplete`. A finished workflow
+ * keeps its journal — one row per step — until something deletes it, so
+ * without this the component's `workflows` and `steps` tables grow forever and
+ * the component's own `loop`/`monitor` mutations eventually exceed their
+ * system-operation budget and start timing out.
+ */
+export const cleanupWorkflow = internalMutation({
+  args: {
+    workflowId: vWorkflowId,
+    result: vResultValidator,
+    context: v.any(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await workflow.cleanup(ctx, args.workflowId)
+
+    return null
+  },
+})
+
+/**
+ * One-shot drain for journals created before `cleanupWorkflow` existed. Only
+ * touches workflows that already have a `runResult` — a finished run — so a
+ * live workflow is never disturbed. Batched, because deleting a journal is
+ * itself many system operations; run it repeatedly until it returns 0.
+ */
+export const purgeFinishedWorkflows = internalMutation({
+  args: { batch: v.optional(v.number()) },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.batch ?? 20, 50)
+    const page = await workflow.list(ctx, {
+      order: "asc",
+      paginationOpts: { cursor: null, numItems: 200 },
+    })
+
+    let purged = 0
+    for (const entry of page.page) {
+      if (purged >= limit) break
+      if (!entry.runResult) continue
+
+      await workflow.cleanup(ctx, entry.workflowId)
+      purged++
+    }
+
+    return purged
+  },
+})
+
+/**
+ * Recovery for a workflow whose workpool item was lost — the journal still
+ * says a step is in progress, but nothing is scheduled to run it, so it hangs
+ * forever. `from: 0` discards the stale journal and starts the run over.
+ */
+export const restartStalledWorkflow = internalMutation({
+  args: { workflowId: vWorkflowId },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await workflow.restart(ctx, args.workflowId, { from: 0 })
+
+    return null
+  },
+})
+
+/** Recovery for a duplicate or abandoned workflow: stop it and free its journal. */
+export const killWorkflow = internalMutation({
+  args: { workflowId: vWorkflowId },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await workflow.cancel(ctx, args.workflowId)
+    await workflow.cleanup(ctx, args.workflowId)
+
+    return null
   },
 })
 

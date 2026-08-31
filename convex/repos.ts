@@ -15,9 +15,16 @@ import {
   type QueryCtx,
 } from "./_generated/server"
 import schema, { eventKind } from "./schema"
+import { CLEANUP_ON_COMPLETE } from "./workflowOptions"
 
 /** How long a workflow keeps polling before handing off to a fresh instance. */
-const CYCLES_PER_WORKFLOW = 30
+/**
+ * Cycles per polling workflow. The journal is re-read on every step, so cost
+ * inside one workflow grows with the square of its length — a long-lived
+ * journal is what pushes the component's mutations over the system-operation
+ * limit. Handing off more often keeps each journal short.
+ */
+const CYCLES_PER_WORKFLOW = 10
 
 type Identity = { ownerToken: string; clerkUserId: string }
 
@@ -53,21 +60,48 @@ export const listWatched = query({
   },
 })
 
-/** Live feed across every watched repo, or one repo when `repo` is given. */
+/**
+ * Live feed for the activity page: every watched repo, or one repo, and
+ * either every kind of change or just one. Each combination has its own
+ * index, so a filtered feed reads exactly the rows it returns.
+ */
 export const listEvents = query({
   args: {
     paginationOpts: paginationOptsValidator,
     repo: v.optional(v.id("watchedRepos")),
+    kind: v.optional(eventKind),
   },
   returns: paginationResultValidator(schema.doc("repoEvents")),
   handler: async (ctx, args) => {
     const { ownerToken } = await requireIdentity(ctx)
+    const { repo, kind } = args
 
-    if (args.repo) {
-      await requireOwnedRepo(ctx, args.repo)
+    if (repo) await requireOwnedRepo(ctx, repo)
+
+    if (repo && kind) {
       return await ctx.db
         .query("repoEvents")
-        .withIndex("by_repo_and_occurredAt", (q) => q.eq("repo", args.repo!))
+        .withIndex("by_repo_kind_and_occurredAt", (q) =>
+          q.eq("repo", repo).eq("kind", kind)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts)
+    }
+
+    if (repo) {
+      return await ctx.db
+        .query("repoEvents")
+        .withIndex("by_repo_and_occurredAt", (q) => q.eq("repo", repo))
+        .order("desc")
+        .paginate(args.paginationOpts)
+    }
+
+    if (kind) {
+      return await ctx.db
+        .query("repoEvents")
+        .withIndex("by_owner_kind_and_occurredAt", (q) =>
+          q.eq("ownerToken", ownerToken).eq("kind", kind)
+        )
         .order("desc")
         .paginate(args.paginationOpts)
     }
@@ -201,6 +235,23 @@ export const getRepo = internalQuery({
   handler: async (ctx, args) => await ctx.db.get("watchedRepos", args.repoId),
 })
 
+/** Caches the codebase profile the scan builds, so the next scan reuses it. */
+export const saveProfile = internalMutation({
+  args: { repoId: v.id("watchedRepos"), repoProfile: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const repo = await ctx.db.get("watchedRepos", args.repoId)
+    if (!repo) return null
+
+    await ctx.db.patch("watchedRepos", repo._id, {
+      repoProfile: args.repoProfile,
+      profiledAt: Date.now(),
+    })
+
+    return null
+  },
+})
+
 /** The workflow checks this before every cycle so unwatching stops the loop. */
 export const isWatching = internalQuery({
   args: { repoId: v.id("watchedRepos") },
@@ -241,7 +292,7 @@ export const markWatching = internalMutation({
       (await start(ctx, internal.workflows.syncRepoWorkflow, {
         repoId: repo._id,
         cycles: CYCLES_PER_WORKFLOW,
-      }))
+      }, CLEANUP_ON_COMPLETE))
 
     await ctx.db.patch("watchedRepos", repo._id, {
       status: "watching",
@@ -267,7 +318,7 @@ export const continueWatching = internalMutation({
     const workflowId = await start(ctx, internal.workflows.syncRepoWorkflow, {
       repoId: repo._id,
       cycles: CYCLES_PER_WORKFLOW,
-    })
+    }, CLEANUP_ON_COMPLETE)
     await ctx.db.patch("watchedRepos", repo._id, { workflowId })
 
     return null

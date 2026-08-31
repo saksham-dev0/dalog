@@ -12,6 +12,7 @@ import {
   type QueryCtx,
 } from "./_generated/server"
 import schema, { channel } from "./schema"
+import { CLEANUP_ON_COMPLETE } from "./workflowOptions"
 
 export const CHANNELS = ["x", "linkedin", "reddit", "blog", "video"] as const
 export type Channel = (typeof CHANNELS)[number]
@@ -154,7 +155,7 @@ export const openEventDraft = mutation({
     const workflowId = await start(ctx, internal.workflows.scanEventWorkflow, {
       draftId,
       version: existing?.version ?? 1,
-    })
+    }, CLEANUP_ON_COMPLETE)
     await ctx.db.patch("contentDrafts", draftId, { workflowId })
 
     return draftId
@@ -181,7 +182,7 @@ export const generatePieces = mutation({
     const workflowId = await start(ctx, internal.workflows.writeContentWorkflow, {
       draftId: draft._id,
       version,
-    })
+    }, CLEANUP_ON_COMPLETE)
     await ctx.db.patch("contentDrafts", draft._id, { workflowId })
 
     return null
@@ -221,7 +222,7 @@ export const maybeScanMergedEvent = internalMutation({
     const workflowId = await start(ctx, internal.workflows.scanEventWorkflow, {
       draftId,
       version: 1,
-    })
+    }, CLEANUP_ON_COMPLETE)
     await ctx.db.patch("contentDrafts", draftId, { workflowId })
 
     return null
@@ -424,6 +425,7 @@ export const saveSourceDigest = internalMutation({
     draftId: v.id("contentDrafts"),
     version: v.number(),
     sourceDigest: v.string(),
+    repoProfile: v.optional(v.string()),
     headline: v.optional(v.string()),
   },
   returns: v.null(),
@@ -433,6 +435,7 @@ export const saveSourceDigest = internalMutation({
 
     await ctx.db.patch("contentDrafts", draft._id, {
       sourceDigest: args.sourceDigest,
+      repoProfile: args.repoProfile ?? draft.repoProfile,
       headline: args.headline ?? draft.headline,
     })
 

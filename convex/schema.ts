@@ -57,6 +57,14 @@ export default defineSchema({
     lastError: v.optional(v.string()),
     /** Denormalized — Convex has no count operator. */
     eventCount: v.number(),
+    /**
+     * A rendered profile of the codebase itself — description, languages,
+     * dependencies, directory layout and README excerpt. Cached here because
+     * it changes far more slowly than the events do, and every scan needs it
+     * to read a diff in the context of the project it landed in.
+     */
+    repoProfile: v.optional(v.string()),
+    profiledAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerToken"])
     .index("by_owner_and_fullName", ["ownerToken", "fullName"])
@@ -85,7 +93,10 @@ export default defineSchema({
   })
     .index("by_repo_and_externalId", ["repo", "externalId"])
     .index("by_owner_and_occurredAt", ["ownerToken", "occurredAt"])
-    .index("by_repo_and_occurredAt", ["repo", "occurredAt"]),
+    .index("by_repo_and_occurredAt", ["repo", "occurredAt"])
+    // The activity filters: one kind, across every repo or inside one repo.
+    .index("by_owner_kind_and_occurredAt", ["ownerToken", "kind", "occurredAt"])
+    .index("by_repo_kind_and_occurredAt", ["repo", "kind", "occurredAt"]),
 
   /**
    * One drafting run over a slice of repo activity: what the model read, what
@@ -112,6 +123,8 @@ export default defineSchema({
     userContext: v.optional(v.string()),
     /** Commits, PRs and diff excerpts the model was given. */
     sourceDigest: v.optional(v.string()),
+    /** Snapshot of the repo profile this draft was scanned against. */
+    repoProfile: v.optional(v.string()),
     /** What the grounded research pass found about format and virality. */
     research: v.optional(v.string()),
     researchSources: v.optional(v.array(v.string())),

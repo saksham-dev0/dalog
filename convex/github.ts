@@ -320,3 +320,219 @@ export const syncRepo = internalAction({
   returns: v.number(),
   handler: async (ctx, args) => await syncRepoOnce(ctx, args.repoId),
 })
+
+/* -------------------------------------------------------------------------- */
+/* Repo profile — what the codebase IS, independent of any one change          */
+/* -------------------------------------------------------------------------- */
+
+/** A profile older than this is rebuilt on the next scan. */
+const PROFILE_TTL_MS = 6 * 60 * 60 * 1000
+const MAX_README_CHARS = 6_000
+const MAX_TREE_ENTRIES = 400
+
+type TreeEntry = { path: string; type: string; size?: number }
+
+/** Files worth naming outright: they tell the model what kind of project this is. */
+const SIGNAL_FILES =
+  /^(package\.json|pyproject\.toml|Cargo\.toml|go\.mod|Gemfile|pom\.xml|build\.gradle|composer\.json|requirements\.txt|Dockerfile|docker-compose\.ya?ml|schema\.prisma|convex\.json|next\.config\.[a-z]+|vite\.config\.[a-z]+|tsconfig\.json|CLAUDE\.md|CONTRIBUTING\.md|ARCHITECTURE\.md)$/i
+
+async function githubJsonSoft<T>(
+  token: string,
+  path: string
+): Promise<T | null> {
+  const res = await githubFetch(token, path)
+  if (!res.ok) return null
+
+  return (await res.json()) as T
+}
+
+/**
+ * Fetch a file's raw contents, or null when it does not exist. `path` is the
+ * API path under the repo — `readme` has its own endpoint, everything else
+ * lives under `contents/`.
+ */
+async function githubFileText(
+  token: string,
+  fullName: string,
+  path: string,
+  limit: number
+): Promise<string | null> {
+  const res = await githubFetch(token, `/repos/${fullName}/${path}`, {
+    headers: { Accept: "application/vnd.github.raw" },
+  })
+  if (!res.ok) return null
+
+  const text = await res.text()
+
+  return text.slice(0, limit)
+}
+
+/**
+ * Folds a recursive tree into a per-directory summary. The full list of a few
+ * thousand paths is useless to a model and expensive; the shape of the tree —
+ * which directories exist and how big they are — is what tells it where the
+ * changed files sit.
+ */
+function summarizeTree(entries: TreeEntry[]): string {
+  const files = entries.filter((entry) => entry.type === "blob")
+  const dirs = new Map<string, number>()
+  const extensions = new Map<string, number>()
+
+  for (const file of files) {
+    const parts = file.path.split("/")
+    const dir = parts.length > 1 ? parts.slice(0, 2).join("/") : "(root)"
+    dirs.set(dir, (dirs.get(dir) ?? 0) + 1)
+
+    const ext = parts[parts.length - 1].split(".").slice(1).pop()
+    if (ext) extensions.set(ext, (extensions.get(ext) ?? 0) + 1)
+  }
+
+  const byCount = (a: [string, number], b: [string, number]) => b[1] - a[1]
+  const layout = [...dirs.entries()]
+    .sort(byCount)
+    .slice(0, MAX_TREE_ENTRIES)
+    .map(([dir, count]) => `- ${dir}/ (${count} files)`)
+    .join("\n")
+  const exts = [...extensions.entries()]
+    .sort(byCount)
+    .slice(0, 12)
+    .map(([ext, count]) => `.${ext} × ${count}`)
+    .join(", ")
+  const signal = files
+    .filter((file) => SIGNAL_FILES.test(file.path.split("/").pop() ?? ""))
+    .map((file) => file.path)
+    .slice(0, 30)
+
+  return [
+    `Total files: ${files.length}`,
+    exts ? `File types: ${exts}` : "",
+    signal.length > 0 ? `Key files: ${signal.join(", ")}` : "",
+    layout ? `Layout:\n${layout}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+/** Dependencies say more about a stack than any prose description does. */
+function summarizeDependencies(packageJson: string | null): string {
+  if (!packageJson) return ""
+
+  try {
+    const parsed = JSON.parse(packageJson) as {
+      name?: string
+      description?: string
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+      scripts?: Record<string, string>
+    }
+    const deps = Object.keys(parsed.dependencies ?? {})
+    const dev = Object.keys(parsed.devDependencies ?? {})
+
+    return [
+      parsed.description ? `package.json description: ${parsed.description}` : "",
+      deps.length > 0 ? `Dependencies: ${deps.slice(0, 60).join(", ")}` : "",
+      dev.length > 0 ? `Dev dependencies: ${dev.slice(0, 40).join(", ")}` : "",
+      parsed.scripts
+        ? `Scripts: ${Object.keys(parsed.scripts).slice(0, 20).join(", ")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * Builds (or returns the cached) profile of the whole codebase: metadata,
+ * languages, dependencies, directory layout and the README. A diff read
+ * without this is a diff read blind — the model cannot tell what the project
+ * is for, so it writes generically about the lines that moved.
+ */
+export const buildRepoProfile = internalAction({
+  args: { repoId: v.id("watchedRepos"), force: v.optional(v.boolean()) },
+  returns: v.string(),
+  handler: async (ctx, args): Promise<string> => {
+    const repo: Doc<"watchedRepos"> | null = await ctx.runQuery(
+      internal.repos.getRepo,
+      { repoId: args.repoId }
+    )
+    if (!repo) throw new Error("Repo not found")
+
+    const fresh =
+      repo.repoProfile &&
+      repo.profiledAt &&
+      Date.now() - repo.profiledAt < PROFILE_TTL_MS
+    if (fresh && !args.force) return repo.repoProfile as string
+
+    const token = await getGithubToken(repo.clerkUserId)
+    const name = repo.fullName
+
+    const [meta, languages, tree, readme, packageJson] = await Promise.all([
+      githubJsonSoft<{
+        description?: string | null
+        topics?: string[]
+        homepage?: string | null
+        created_at?: string
+        pushed_at?: string
+        stargazers_count?: number
+        forks_count?: number
+        open_issues_count?: number
+        license?: { spdx_id?: string } | null
+      }>(token, `/repos/${name}`),
+      githubJsonSoft<Record<string, number>>(token, `/repos/${name}/languages`),
+      githubJsonSoft<{ tree?: TreeEntry[]; truncated?: boolean }>(
+        token,
+        `/repos/${name}/git/trees/${encodeURIComponent(repo.defaultBranch)}?recursive=1`
+      ),
+      githubFileText(token, name, "readme", MAX_README_CHARS),
+      githubFileText(token, name, "contents/package.json", 20_000),
+    ])
+
+    const totalBytes = Object.values(languages ?? {}).reduce(
+      (sum, bytes) => sum + bytes,
+      0
+    )
+    const languageLine =
+      languages && totalBytes > 0
+        ? Object.entries(languages)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(
+              ([lang, bytes]) =>
+                `${lang} ${Math.round((bytes / totalBytes) * 100)}%`
+            )
+            .join(", ")
+        : ""
+
+    const profile = [
+      `PROJECT: ${name}`,
+      meta?.description ? `Description: ${meta.description}` : "",
+      meta?.topics && meta.topics.length > 0
+        ? `Topics: ${meta.topics.join(", ")}`
+        : "",
+      meta?.homepage ? `Homepage: ${meta.homepage}` : "",
+      `Default branch: ${repo.defaultBranch}${repo.isPrivate ? " (private repo)" : ""}`,
+      meta?.created_at ? `Created: ${meta.created_at.slice(0, 10)}` : "",
+      typeof meta?.stargazers_count === "number"
+        ? `Stars: ${meta.stargazers_count}, forks: ${meta.forks_count ?? 0}, open issues: ${meta.open_issues_count ?? 0}`
+        : "",
+      languageLine ? `Languages: ${languageLine}` : "",
+      summarizeDependencies(packageJson),
+      tree?.tree ? `\nCODEBASE\n${summarizeTree(tree.tree)}` : "",
+      tree?.truncated
+        ? "(tree truncated by GitHub; the layout above is partial)"
+        : "",
+      readme ? `\nREADME\n${readme}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+
+    await ctx.runMutation(internal.repos.saveProfile, {
+      repoId: args.repoId,
+      repoProfile: profile,
+    })
+
+    return profile
+  },
+})
